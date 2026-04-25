@@ -61,6 +61,9 @@ _EXAMPLES = {
 _TERMINAL_INTENTS_UI = {
     "greeting", "help", "no_intent", "about_data",
     "explain_result", "explain_metric", "explain_table", "no_intent_guided",
+    "clarify_metric", "clarify_country_scope",
+    "explain_segments", "available_metrics", "available_metrics_for_scope",
+    "explain_signals", "explain_result_simple",
 }
 
 

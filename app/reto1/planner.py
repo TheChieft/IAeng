@@ -70,11 +70,56 @@ _EXPLAIN_TABLE_RE = re.compile(
     r"estos?\s*números?)\b",
     re.IGNORECASE,
 )
+_EXPLAIN_TABLE_GENERIC_RE = re.compile(
+    r"\b(qué\s*significa\s*(esa|esta|la)?\s*tabla|explícame\s*(esa|esta|la)?\s*tabla|"
+    r"qué\s*significa\s*(esa|esta|la)?\s*evidencia|tradúceme\s*(esa|esta|la)?\s*evidencia)\b",
+    re.IGNORECASE,
+)
+_EXPLAIN_SEGMENTS_RE = re.compile(
+    r"\b("
+    r"(wealthy\s+y\s+non\s*wealthy|wealthy|non\s*wealthy|zonas?\s*wealthy|zonas?\s*non\s*wealthy|"
+    r"categor[ií]as?|segmentos?)\b.*(expl[ií]came|expl[ií]camelos?|cu[aá]l\s*es\s*la\s*diferencia|"
+    r"qu[eé]\s*significan|qu[eé]\s*son|qu[eé]\s*es|qu[eé]\s*son\s*esas|qu[eé]\s*significa)"
+    r"|"
+    r"(expl[ií]came|expl[ií]camelos?|cu[aá]l\s*es\s*la\s*diferencia|qu[eé]\s*significan|qu[eé]\s*son|qu[eé]\s*es)"
+    r".*(wealthy\s+y\s+non\s*wealthy|wealthy|non\s*wealthy|zonas?\s*wealthy|zonas?\s*non\s*wealthy|"
+    r"categor[ií]as?|segmentos?)"
+    r")\b",
+    re.IGNORECASE,
+)
+_AVAILABLE_METRICS_RE = re.compile(
+    r"\b(qué\s*métricas\s*(tenemos|hay|están|existen)|indicadores\s*disponibles|"
+    r"con\s*qué\s*métricas\s*puedo\s*medir|qué\s*puedo\s*medir|"
+    r"métricas\s*para\s*\w+|métricas\s*que\s*tenemos|qué\s*métricas\s*hay\s*para)\b",
+    re.IGNORECASE,
+)
+_EXPLAIN_SIGNALS_RE = re.compile(
+    r"\b(qué\s*significan\s*estas\s*señales|qué\s*significan\s*las\s*señales|"
+    r"explícame\s*estas\s*señales|explícame\s*las\s*señales|por\s*qué\s*son\s*alertas|"
+    r"qué\s*me\s*está\s*diciendo\s*esto|qué\s*me\s*dice\s*esto|qué\s*dice\s*esto|"
+    r"qué\s*está\s*diciendo\s*esto)\b",
+    re.IGNORECASE,
+)
+_EXPLAIN_RESULT_SIMPLE_RE = re.compile(
+    r"\b(explícamelo\s*mejor|explícamelo|en\s*palabras\s*simples|qué\s*significa\s*eso|"
+    r"qué\s*significa\s*esto|por\s*qué\s*importa|tradúceme\s*esa\s*evidencia|"
+    r"explícalo\s*simple|más\s*simple|en\s*simple|resume\s*esto)\b",
+    re.IGNORECASE,
+)
+_SCOPE_SWITCH_RE = re.compile(
+    r"\b(y\s+en\s+(colombia|méxico|mexico|brasil|brazil|argentina|chile|perú|peru|ecuador|uruguay|costa\s*rica)|"
+    r"y\s+en\s+(wealthy|non\s*wealthy)|y\s+solo\s+en\s+\w+|solo\s+en\s+\w+|"
+    r"y\s+si\s*miro\s+(wealthy|non\s*wealthy)|cambia\s+a\s+\w+)\b",
+    re.IGNORECASE,
+)
 
 # Terminal intents — no tool call, no state inheritance, clean plans
 _TERMINAL_INTENTS = {
     "greeting", "help", "no_intent", "about_data",
     "explain_result", "explain_metric", "explain_table", "no_intent_guided",
+    "clarify_metric", "clarify_country_scope",
+    "explain_segments", "available_metrics", "available_metrics_for_scope",
+    "explain_signals", "explain_result_simple",
 }
 
 _CLEAN_PLAN_BASE = {
@@ -113,6 +158,14 @@ def _is_too_short(text: str) -> bool:
     return len(text.strip()) < 4
 
 
+def _is_vague_country_scope(text: str) -> bool:
+    return bool(_VAGUE_COUNTRY_SCOPE_RE.search(text))
+
+
+def _has_context(state) -> bool:
+    return bool(state and (state.last_intent or state.last_metric_id or state.last_top_insight or state.last_compare_result))
+
+
 # ── keyword maps ─────────────────────────────────────────────────────────────
 
 _RANK_KW = r"\b(top|ranking|rank|mejor|peor|mejores|peores|mayor|menor|más alto|más bajo|máximo|mínimo|cuál.*más|cuáles.*más)\b"
@@ -121,8 +174,14 @@ _TREND_KW = r"\b(tendencia|trend|evolución|evoluciona|semanas|histórico|últim
 _INSIGHT_KW = r"\b(insight|problema|alert|alerta|qué.*pasa|qué.*tiene|situación|estado|reporte|resumen|issues)\b"
 _HYPOTHESIS_KW = r"\b(hipótesis|hypothesis|explica|driver|causa|razón|por qué|podría.*ser|qué.*podría|asocia)\b"
 _FOLLOWUP_SCOPE_KW = r"\b(solo en|solo para|ahora en|pero en|filtra|cambia.*a|en colombia|en méxico|en brasil|en argentina|en chile|en perú|en ecuador|en uruguay)\b"
-_FOLLOWUP_VIZ_KW = r"\b(muestr.*gráfico|muéstramelo|en gráfico|visualiz|chart|gráfica|tabla|ahora.*gráfico)\b"
+_FOLLOWUP_VIZ_KW = r"\b(muestr.*gráfico|muéstramelo|en gráfico|visualiz|chart|gráfica|ahora.*gráfico)\b"
 _QUERY_KW = r"\b(cuánto|cuál.*valor|dame el|promedio|mediana|agregado|aggregate|valor de)\b"
+_VAGUE_COUNTRY_SCOPE_RE = re.compile(
+    r"\b(qué\s*está\s*pasando|que\s*esta\s*pasando|qué\s*pasa|que\s*pasa|"
+    r"qué\s*señales\s*hay|que\s*señales\s*hay|qué\s*está\s*sucediendo|"
+    r"que\s*esta\s*sucediendo|cómo\s*va|como\s*va)\b",
+    re.IGNORECASE,
+)
 
 _METRIC_ALIASES: dict[str, str] = {
     "perfect orders": "perfect_orders",
@@ -153,9 +212,12 @@ _COUNTRY_MAP: dict[str, str] = {
 
 _VALID_INTENTS: set[str] = {
     "rank", "compare", "trend", "insight_request", "hypothesis_request",
-    "follow_up_scope_refine", "follow_up_visualization", "query",
+    "follow_up_scope_refine", "follow_up_visualization", "query", "scope_switch",
     "greeting", "help", "no_intent", "about_data",
     "explain_result", "explain_metric", "explain_table", "no_intent_guided",
+    "clarify_metric", "clarify_country_scope",
+    "explain_segments", "available_metrics", "available_metrics_for_scope",
+    "explain_signals", "explain_result_simple",
 }
 
 
@@ -232,6 +294,53 @@ def classify_intent(text: str, state=None) -> dict:
                 "last_intent": state.last_intent,
             }
         return plan
+    if _EXPLAIN_TABLE_GENERIC_RE.search(text):
+        plan = _terminal_plan("explain_table", text)
+        if state:
+            plan["_explain_context"] = {
+                "last_result_type": state.last_visualization,
+                "last_intent": state.last_intent,
+            }
+        return plan
+    if _EXPLAIN_SEGMENTS_RE.search(text):
+        return _terminal_plan("explain_segments", text)
+    if _AVAILABLE_METRICS_RE.search(text):
+        country = _extract_country(text)
+        intent = "available_metrics_for_scope" if country else "available_metrics"
+        plan = _terminal_plan(intent, text)
+        if country:
+            plan["entity_scope"] = {"country": country, "city": None, "zone": None}
+        return plan
+    if _EXPLAIN_SIGNALS_RE.search(text):
+        plan = _terminal_plan("explain_signals", text)
+        if state:
+            plan["_signal_context"] = {
+                "last_insight": state.last_top_insight,
+                "last_metric": state.last_metric_id,
+                "last_metric_display": state.last_metric_display,
+                "last_entity": dict(state.last_entity),
+                "last_intent": state.last_intent,
+                "last_summary_text": state.last_summary_text,
+                "last_compare_result": state.last_compare_result,
+                "last_trend_result": state.last_trend_result,
+                "last_result_type": state.last_result_type,
+            }
+        return plan
+    if _EXPLAIN_RESULT_SIMPLE_RE.search(text):
+        plan = _terminal_plan("explain_result_simple", text)
+        if state:
+            plan["_explain_context"] = {
+                "last_insight": state.last_top_insight,
+                "last_metric": state.last_metric_id,
+                "last_metric_display": state.last_metric_display,
+                "last_entity": dict(state.last_entity),
+                "last_intent": state.last_intent,
+                "last_compare_result": state.last_compare_result,
+                "last_trend_result": state.last_trend_result,
+                "last_result_type": state.last_result_type,
+                "last_summary_text": state.last_summary_text,
+            }
+        return plan
     if _is_explain_metric(text):
         plan = _terminal_plan("explain_metric", text)
         metric_id = _extract_metric(text)
@@ -257,6 +366,8 @@ def classify_intent(text: str, state=None) -> dict:
 
     if re.search(_FOLLOWUP_VIZ_KW, t_lower):
         intent = "follow_up_visualization"
+    elif re.search(_SCOPE_SWITCH_RE, t_lower) and state and _has_context(state):
+        intent = "scope_switch"
     elif re.search(_FOLLOWUP_SCOPE_KW, t_lower) and state and state.last_intent:
         intent = "follow_up_scope_refine"
     elif re.search(_COMPARE_KW, t_lower):
@@ -299,6 +410,14 @@ def classify_intent(text: str, state=None) -> dict:
         }
     elif intent == "compare":
         plan["comparison"] = {"segment_a": "Wealthy", "segment_b": "Non Wealthy", "dimension": "ZONE_TYPE"}
+
+    # Country-level open questions ("qué está pasando en CO") are underspecified.
+    if intent == "insight_request" and country and not metric and _is_vague_country_scope(text):
+        plan["intent"] = "clarify_country_scope"
+        plan["requires_clarification"] = True
+        plan["clarification_question"] = (
+            "¿Quieres ver ranking de zonas, señales/insights o comparación Wealthy vs Non Wealthy?"
+        )
 
     return plan
 
@@ -352,6 +471,8 @@ def _gemini_classify(text: str, artifacts: dict) -> tuple[dict | None, bool, str
     """
     if (_is_greeting(text) or _is_help(text) or _is_about_data(text)
             or _is_explain(text) or _is_explain_metric(text) or _is_explain_table(text)
+            or _EXPLAIN_SEGMENTS_RE.search(text) or _AVAILABLE_METRICS_RE.search(text)
+            or _EXPLAIN_SIGNALS_RE.search(text) or _EXPLAIN_RESULT_SIMPLE_RE.search(text)
             or _is_too_short(text)):
         return None, False, "terminal_shortcircuit"
 
@@ -434,6 +555,45 @@ def validate_plan(plan: dict, artifacts: dict) -> dict:
         return {"valid": False, "action": "reject", "reason": f"Intent '{intent}' not supported",
                 "suggestion": "Reformula como ranking, comparación o insight.", "adjusted_plan": plan}
 
+    requires_metric_intents = {"rank", "compare", "trend", "query"}
+    if intent in requires_metric_intents and not metric:
+        clarified = {
+            **plan,
+            "intent": "clarify_metric",
+            "requires_clarification": True,
+            "clarification_question": (
+                "Puedo medir desempeño de varias formas. "
+                "¿Quieres verlo por Perfect Orders, Gross Profit UE, Turbo Adoption o Pro Adoption?"
+            ),
+        }
+        return {
+            "valid": True,
+            "action": "clarify",
+            "reason": "missing_metric",
+            "suggestion": "Selecciona una métrica para continuar.",
+            "adjusted_plan": clarified,
+        }
+
+    if intent == "insight_request":
+        raw_text = str(plan.get("_raw_text", ""))
+        country = (plan.get("entity_scope") or {}).get("country")
+        if country and not metric and _is_vague_country_scope(raw_text):
+            clarified = {
+                **plan,
+                "intent": "clarify_country_scope",
+                "requires_clarification": True,
+                "clarification_question": (
+                    "¿Quieres ver ranking de zonas, señales/insights o comparación Wealthy vs Non Wealthy?"
+                ),
+            }
+            return {
+                "valid": True,
+                "action": "clarify",
+                "reason": "vague_country_scope",
+                "suggestion": "Elige el tipo de análisis para ese país.",
+                "adjusted_plan": clarified,
+            }
+
     if metric in SUSPENDED_METRICS:
         return {"valid": False, "action": "reject",
                 "reason": "lead_penetration suspendida — definición pendiente con equipo de datos.",
@@ -506,10 +666,17 @@ def build_plan(text: str, artifacts: dict, state=None) -> dict:
             "last_intent": state.last_intent,
         }
 
+    if state and _SCOPE_SWITCH_RE.search(str(plan.get("_raw_text", text))) and _has_context(state):
+        from app.reto1.state import apply_scope_switch
+        plan = apply_scope_switch(state, plan)
+
     # follow-up context inheritance
-    if state and plan.get("intent") in ("follow_up_scope_refine", "follow_up_visualization"):
-        from app.reto1.state import apply_follow_up
-        plan = apply_follow_up(state, plan)
+    if state and plan.get("intent") in ("follow_up_scope_refine", "follow_up_visualization", "scope_switch"):
+        from app.reto1.state import apply_follow_up, apply_scope_switch
+        if plan.get("intent") == "scope_switch":
+            plan = apply_scope_switch(state, plan)
+        else:
+            plan = apply_follow_up(state, plan)
 
     validation = validate_plan(plan, artifacts)
     if not validation["valid"]:

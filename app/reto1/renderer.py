@@ -14,6 +14,21 @@ _CAUSAL_TERMS = re.compile(
 _ALL_TERMINAL_INTENTS = {
     "greeting", "help", "no_intent", "about_data",
     "explain_result", "explain_metric", "explain_table", "no_intent_guided",
+    "clarify_metric", "clarify_country_scope",
+    "explain_segments", "available_metrics", "available_metrics_for_scope",
+    "explain_signals", "explain_result_simple",
+}
+
+_COUNTRY_NAMES = {
+    "AR": "Argentina",
+    "BR": "Brasil",
+    "CL": "Chile",
+    "CO": "Colombia",
+    "CR": "Costa Rica",
+    "EC": "Ecuador",
+    "MX": "México",
+    "PE": "Perú",
+    "UY": "Uruguay",
 }
 
 
@@ -248,6 +263,132 @@ def _build_answer_short(plan: dict, result: dict) -> str:  # noqa: C901
             + "\n\nTambién puedes escribir **ayuda** para ver todo lo que puedo hacer."
         )
 
+    if intent == "clarify_metric":
+        return (
+            "Puedo medir desempeño de varias formas. "
+            "¿Quieres verlo por **Perfect Orders**, **Gross Profit UE**, "
+            "**Turbo Adoption** o **Pro Adoption**?\n\n"
+            "Si prefieres, también puedo usar **Perfect Orders** como KPI general por convención."
+        )
+
+    if intent == "clarify_country_scope":
+        country_name = _COUNTRY_NAMES.get(country, country)
+        return (
+            f"En {country_name} te puedo ayudar de varias maneras. "
+            "¿Quieres ver **ranking de zonas**, **señales/insights** o "
+            "**comparación Wealthy vs Non Wealthy**?"
+        )
+
+    if intent == "explain_segments":
+        return (
+            "**Wealthy** y **Non Wealthy** son dos formas de agrupar zonas según su perfil socioeconómico. "
+            "Sirven para comparar si una métrica se comporta distinto entre zonas con más poder adquisitivo y el resto.\n\n"
+            "Te conviene usarlos para métricas como **Perfect Orders**, **Gross Profit UE**, **Turbo Adoption** o **Pro Adoption**. "
+            "Como limitación, no dicen nada sobre el usuario final: solo describen el tipo de zona."
+        )
+
+    if intent == "available_metrics":
+        return (
+            "Las métricas más útiles para explorar aquí son **Perfect Orders**, **Gross Profit UE**, "
+            "**Turbo Adoption**, **Pro Adoption** y **Restaurants Markdowns/GMV**.\n\n"
+            "Si quieres, te las puedo ordenar por una lectura práctica: desempeño general, crecimiento, monetización o fricción operativa."
+        )
+
+    if intent == "available_metrics_for_scope":
+        country_name = _COUNTRY_NAMES.get(country, country or "ese país")
+        return (
+            f"Para **{country_name}** puedes mirar las mismas métricas operativas principales, pero normalmente empieza por **Perfect Orders**, "
+            "**Gross Profit UE**, **Turbo Adoption** y **Pro Adoption**.\n\n"
+            "Si quieres una lectura más accionable, también puedo decirte cuáles son las más útiles para ranking, tendencia o alertas."
+        )
+
+    if intent == "explain_signals":
+        ctx = plan.get("_signal_context") or {}
+        last_insight = ctx.get("last_insight")
+        summary = ctx.get("last_summary_text") or (last_insight or {}).get("summary_text") or ""
+        metric_name = ctx.get("last_metric_display") or ctx.get("last_metric") or "la métrica"
+        entity = (ctx.get("last_entity") or {}).get("country") or "el scope actual"
+        if not summary and not last_insight:
+            return (
+                "Las señales son hallazgos que detecta el motor de insights cuando ve algo que merece atención. "
+                "Pueden ser una anomalía puntual, una caída persistente, una brecha contra pares o una oportunidad.\n\n"
+                "Si quieres, primero muéstrame un resultado y luego te explico esas señales en contexto."
+            )
+        if not summary and last_insight:
+            short_summary = (
+                f"Se detectó una señal en {last_insight.get('display_entity', entity)} sobre "
+                f"{last_insight.get('metric_display_name', metric_name)}."
+            )
+        else:
+            short_summary = str(summary)[:260]
+        return (
+            f"En **{entity}**, estas señales hablan de **{metric_name}**. En palabras simples: el sistema detectó algo que vale la pena mirar, no una causa confirmada.\n\n"
+            f"**Qué está pasando:** {short_summary}\n\n"
+            "**Por qué importa:** puede ser una anomalía puntual, una tendencia que se está deteriorando, una brecha frente a pares o una oportunidad de mejora.\n\n"
+            "**Qué miraría después:** si la señal se repite en el tiempo, si afecta solo una zona o si aparece también en comparaciones contra otros segmentos."
+        )
+
+    if intent == "explain_result_simple":
+        ctx = plan.get("_explain_context") or {}
+        last_result_type = ctx.get("last_result_type")
+        last_metric_display = ctx.get("last_metric_display") or ctx.get("last_metric") or "la métrica"
+        last_entity = ctx.get("last_entity") or {}
+        country_name = _COUNTRY_NAMES.get(last_entity.get("country"), last_entity.get("country") or "el scope actual")
+        if not last_result_type:
+            return (
+                "No tengo un resultado previo suficientemente claro para resumir en palabras simples. "
+                "Primero haz una consulta analítica y luego te lo traduzco."
+            )
+        if last_result_type == "compare" and ctx.get("last_compare_result"):
+            compare = ctx["last_compare_result"]
+            seg_a = compare.get("segment_a", {})
+            seg_b = compare.get("segment_b", {})
+            delta = compare.get("delta")
+            winner = seg_a.get("name") if (delta or 0) >= 0 else seg_b.get("name")
+            return (
+                f"En simple: en **{country_name}**, **{winner}** está mejor en **{last_metric_display}**. "
+                "Eso importa porque muestra una brecha real entre los dos grupos.\n\n"
+                f"**Evidencia:** {seg_a.get('name')} = {seg_a.get('value', '—')} y {seg_b.get('name')} = {seg_b.get('value', '—')}.\n\n"
+                "**Qué miraría después:** si esa diferencia se mantiene en otras semanas o si aparece también en otros países."
+            )
+        if last_result_type == "trend" and ctx.get("last_trend_result"):
+            trend = ctx["last_trend_result"]
+            rows = trend.get("rows", [])
+            if rows:
+                oldest = rows[0]["value"]
+                latest = rows[-1]["value"]
+                direction = "subió" if latest > oldest else "bajó" if latest < oldest else "se mantuvo igual"
+                return (
+                    f"En simple: **{last_metric_display}** en **{country_name}** {direction}. "
+                    "Eso importa porque te dice si la zona está avanzando o deteriorándose.\n\n"
+                    f"**Evidencia:** empezó en {oldest:.3f} y terminó en {latest:.3f}.\n\n"
+                    "**Qué miraría después:** si el cambio fue consistente o si fue un salto aislado."
+                )
+        if last_result_type == "rank" and ctx.get("last_compare_result") is None:
+            return (
+                f"En simple: el ranking ordena las zonas por **{last_metric_display}** en **{country_name}**. "
+                "La primera queda arriba porque tiene el mejor valor para esa métrica.\n\n"
+                "**Evidencia:** el sistema ordenó las zonas del mejor al peor desempeño en la semana actual.\n\n"
+                "**Qué miraría después:** si el líder se mantiene o si cambia cuando miras otra semana."
+            )
+        if last_result_type == "insight_request" and (ctx.get("last_summary_text") or ctx.get("last_insight")):
+            last_insight = ctx.get("last_insight") or {}
+            summary_text = ctx.get("last_summary_text") or last_insight.get("summary_text") or (
+                f"Se detectó una señal en {last_insight.get('display_entity', country_name)} sobre "
+                f"{last_insight.get('metric_display_name', last_metric_display)}."
+            )
+            return (
+                f"En simple: el sistema encontró una señal importante sobre **{last_metric_display}** en **{country_name}**. "
+                "No es una causa confirmada; es una alerta o patrón que merece atención.\n\n"
+                f"**Evidencia:** {summary_text}\n\n"
+                "**Qué miraría después:** si la señal persiste o si también aparece en otras zonas comparables."
+            )
+        return (
+            f"En simple: el resultado anterior te habla de **{last_metric_display}** en **{country_name}**. "
+            "Es la forma corta de decirte si la métrica está bien, mal o cambiando.\n\n"
+            "**Qué miraría después:** comparar con otra semana, otro país o el segmento opuesto."
+        )
+
     if intent == "about_data":
         return (
             "Trabajamos con datos semanales de operaciones de zonas Rappi en **9 países**: "
@@ -445,6 +586,11 @@ def _build_answer_short(plan: dict, result: dict) -> str:  # noqa: C901
         )
 
     if result.get("error"):
+        if result["error"] == "metric required or suspended":
+            return (
+                "Necesito una métrica para responder eso. "
+                "Puedo hacerlo por Perfect Orders, Gross Profit UE, Turbo Adoption o Pro Adoption."
+            )
         return f"No se pudo completar la consulta: {result['error']}"
 
     if intent == "rank":
@@ -720,14 +866,79 @@ def build_response(plan: dict, result: dict, artifacts: dict) -> dict:
     caveat_text = " | ".join(dict.fromkeys(caveats)) if caveats else None
 
     # follow-ups
-    action_templates = _FOLLOWUP_ACTIONS.get(intent, _FOLLOWUP_ACTIONS["insight_request"])
-    followups = [
-        {
-            "label": _render_followup_label(a["label"], metric_display, country),
-            "action": a["action"],
+    if intent == "clarify_metric":
+        country_suffix = f" en {country}" if country else ""
+        preferred_metric_ids = [
+            "perfect_orders",
+            "gross_profit_ue",
+            "turbo_adoption",
+            "pro_adoption_last_week",
+        ]
+        display_by_id = {
+            m.get("id"): m.get("display_name", m.get("id"))
+            for m in metrics_cfg.get("metrics", [])
         }
-        for a in action_templates[:3]
-    ]
+        metric_queries = [
+            {
+                "label": f"Top 5 zonas por {display_by_id[mid]}{country_suffix}",
+                "action": "",
+            }
+            for mid in preferred_metric_ids
+            if display_by_id.get(mid)
+        ]
+        metric_queries.append(
+            {
+                "label": f"Usar KPI general (Perfect Orders){country_suffix}",
+                "action": "",
+            }
+        )
+        followups = metric_queries[:5]
+    elif intent == "clarify_country_scope":
+        country_code = country or "ese país"
+        followups = [
+            {"label": f"Top 5 zonas por Perfect Orders en {country_code}", "action": ""},
+            {"label": f"¿Qué señales hay en {country_code}?", "action": ""},
+            {"label": f"Compara Wealthy vs Non Wealthy por Perfect Orders en {country_code}", "action": ""},
+        ]
+    elif intent == "explain_segments":
+        followups = [
+            {"label": "¿Qué métricas sirven para compararlos?", "action": ""},
+            {"label": "¿Qué diferencia hay entre Wealthy y Non Wealthy?", "action": ""},
+            {"label": "Compara Perfect Orders por segmento", "action": ""},
+        ]
+    elif intent == "available_metrics":
+        followups = [
+            {"label": "¿Cuáles son las métricas que tenemos para México?", "action": ""},
+            {"label": "¿Qué métricas sirven para medir desempeño?", "action": ""},
+            {"label": "Explícamelo en palabras simples", "action": ""},
+        ]
+    elif intent == "available_metrics_for_scope":
+        followups = [
+            {"label": "¿Qué métricas sirven para ranking?", "action": ""},
+            {"label": "¿Qué métricas sirven para alertas?", "action": ""},
+            {"label": "Explícamelo en palabras simples", "action": ""},
+        ]
+    elif intent == "explain_signals":
+        followups = [
+            {"label": "Explícamelo en palabras simples", "action": ""},
+            {"label": "¿Qué significa esa tabla?", "action": ""},
+            {"label": "¿Qué miraría después?", "action": ""},
+        ]
+    elif intent == "explain_result_simple":
+        followups = [
+            {"label": "¿Qué significa esa tabla?", "action": ""},
+            {"label": "¿Por qué importa?", "action": ""},
+            {"label": "¿Y en Colombia cómo se ve esto?", "action": ""},
+        ]
+    else:
+        action_templates = _FOLLOWUP_ACTIONS.get(intent, _FOLLOWUP_ACTIONS["insight_request"])
+        followups = [
+            {
+                "label": _render_followup_label(a["label"], metric_display, country),
+                "action": a["action"],
+            }
+            for a in action_templates[:3]
+        ]
 
     validation = plan.get("_validation", {})
 

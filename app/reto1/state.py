@@ -2,6 +2,15 @@
 from dataclasses import dataclass, field
 
 
+_NON_ANALYTICAL_INTENTS = {
+    "greeting", "help", "no_intent", "about_data",
+    "explain_result", "explain_metric", "explain_table", "no_intent_guided",
+    "clarify_metric", "clarify_country_scope",
+    "explain_segments", "available_metrics", "available_metrics_for_scope",
+    "explain_signals", "explain_result_simple",
+}
+
+
 @dataclass
 class ChatSessionState:
     last_metric_id: str | None = None
@@ -45,8 +54,9 @@ def update_state(state: ChatSessionState, plan: dict, result: dict) -> ChatSessi
         state.last_comparison = plan["comparison"]
     if plan.get("intent") and plan["intent"] != "greeting":
         state.last_intent = plan["intent"]
-        state.last_result_type = plan["intent"]
-        state.mode = "hypothesis" if plan["intent"] == "hypothesis_request" else "direct_answer"
+        if plan["intent"] not in _NON_ANALYTICAL_INTENTS:
+            state.last_result_type = plan["intent"]
+            state.mode = "hypothesis" if plan["intent"] == "hypothesis_request" else "direct_answer"
 
     state.last_tool_result = result
     state.last_tool_name = result.get("tool")
@@ -82,14 +92,40 @@ def apply_follow_up(state: ChatSessionState, new_plan: dict) -> dict:
     scope = merged.get("entity_scope") or {}
     if not any(scope.values()):
         merged["entity_scope"] = dict(state.last_entity)
+    elif scope.get("country"):
+        merged["entity_scope"] = {
+            "country": scope.get("country"),
+            "city": scope.get("city"),
+            "zone": scope.get("zone"),
+        }
+    elif scope.get("city"):
+        merged["entity_scope"] = {
+            "country": state.last_entity.get("country"),
+            "city": scope.get("city"),
+            "zone": scope.get("zone"),
+        }
     else:
         merged["entity_scope"] = {
-            "country": scope.get("country") or state.last_entity.get("country"),
-            "city": scope.get("city") or state.last_entity.get("city"),
+            "country": state.last_entity.get("country"),
+            "city": state.last_entity.get("city"),
             "zone": scope.get("zone") or state.last_entity.get("zone"),
         }
     if not merged.get("time_window"):
         merged["time_window"] = state.last_time_window
+    return merged
+
+
+def apply_scope_switch(state: ChatSessionState, new_plan: dict) -> dict:
+    """Switch only the requested scope while preserving the prior analytical intent."""
+    merged = apply_follow_up(state, new_plan)
+    last_intent = state.last_result_type or state.last_intent or "insight_request"
+    if last_intent == "compare":
+        merged["intent"] = "compare"
+        merged["comparison"] = state.last_comparison or {"segment_a": "Wealthy", "segment_b": "Non Wealthy", "dimension": "ZONE_TYPE"}
+    elif last_intent in {"rank", "trend", "query", "hypothesis_request", "insight_request"}:
+        merged["intent"] = last_intent
+    else:
+        merged["intent"] = "insight_request"
     return merged
 
 
