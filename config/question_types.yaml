@@ -63,7 +63,7 @@ question_types:
       - direction  # top | bottom
       - filter_condition
     future_function: rank_by_metric(metric_id, entity_level, week_offset, n, direction, filters)
-    compatible_metrics: all_except: [lead_penetration]  # outliers invalidan ranking directo
+    compatible_metrics: "all_except: [lead_penetration]"  # outliers invalidan ranking directo
     caveats:
       - >
         Ranking de métricas con desired_direction = lower_is_better (ej: markdowns_gmv)

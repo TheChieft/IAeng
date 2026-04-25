@@ -154,7 +154,7 @@ language_rules:
       (higher_is_better o lower_is_better) con direction_confidence != unknown_pending_validation.
       Para métricas con depends o unknown: describir el cambio en términos neutros.
     example_safe: "Gross Profit UE aumentó 0.5 puntos WoW en esta zona."
-    example_unsafe: "Esta zona mejoró su rentabilidad." (requiere validación de negocio)
+    example_unsafe: "Esta zona mejoró su rentabilidad. (requiere validación de negocio)"
 
   causal_language:
     forbidden_terms: [causó, determinó, explica, genera, produce, es la causa de]

@@ -40,7 +40,7 @@ Repositorio para la prueba técnica de Rappi. Dos retos que comparten base de da
 **1. Ejecutar el pipeline de datos (una vez, o cuando cambia el raw):**
 
 ```
-notebooks/00_data_prep_common.ipynb
+notebooks/reto1/00_reto1_data_prep.ipynb
 ```
 
 Genera todos los artefactos en `data/interim/` y `data/processed/`.  
@@ -49,15 +49,17 @@ Incluye validación de 10 checks al final — todos deben ser PASS.
 **2. Exploración y diseño del sistema:**
 
 ```
-notebooks/10_reto1_eda.ipynb          # EDA formal orientado a diseño del sistema
-notebooks/20_reto1_semantic_layer.ipynb  # Capa semántica y contratos de métricas
-notebooks/30_reto1_insight_engine.ipynb  # Detectores de anomalías y alertas
-notebooks/40_reto1_chatbot_design.ipynb  # Arquitectura del bot conversacional
+notebooks/reto1/10_reto1_eda.ipynb              # EDA formal orientado a diseño del sistema
+notebooks/reto1/20_reto1_semantic_layer.ipynb   # Capa semántica y contratos de métricas
+notebooks/reto1/30_reto1_insight_engine.ipynb   # Detectores de anomalías y alertas [placeholder]
+notebooks/reto1/40_reto1_chatbot_design.ipynb   # Arquitectura del bot conversacional [placeholder]
 ```
+
+Ver `notebooks/reto1/README.md` para documentación completa del flujo.
 
 ---
 
-## Artefactos generados por `00_data_prep_common.ipynb`
+## Artefactos generados por `00_reto1_data_prep.ipynb`
 
 | Archivo | Ubicación | Descripción |
 |---|---|---|

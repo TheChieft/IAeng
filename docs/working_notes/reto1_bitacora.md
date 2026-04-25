@@ -126,3 +126,49 @@ Cómo estructurar y preparar datos semanales por zona para habilitar análisis r
 
 Sección reservada para integrar posteriormente la investigación amplia del reto 1.
 No se incorpora contenido en esta iteración.
+
+---
+
+## Iteración 5 — 2026-04-25: Reorganización, capa semántica y gobernanza
+
+### Cambios estructurales
+
+- Notebooks movidos a subdirectorios: `notebooks/reto1/` y `notebooks/reto2/`
+- Notebook 00 renombrado: `00_data_prep_common.ipynb` → `00_reto1_data_prep.ipynb`
+- Notebook 10 renombrado: `reto1_eda.ipynb` → `10_reto1_eda.ipynb`
+- Creados READMEs en `notebooks/reto1/` y `notebooks/reto2/`
+- `docs/working_notes/reto1_data_prep_decisions.md` reescrito: removidas referencias a `src/data_prep/` (eliminado en iter. 4), actualizado con estructura vigente
+- Limpieza de reportes redundantes en `reports/reto1/`
+
+### Archivos de configuración creados
+
+| Archivo | Contenido |
+|---|---|
+| `config/metrics.yaml` | Catálogo de 13 métricas: escala, dirección, confianza, riesgo de outlier |
+| `config/business_rules.yaml` | Entidades, peer groups, reglas temporales, detectores, reglas de lenguaje |
+| `config/question_types.yaml` | 7 intents del sistema con parámetros, funciones futuras y ejemplos |
+
+### Notebook 20 — Semantic Layer (primera iteración real)
+
+`notebooks/reto1/20_reto1_semantic_layer.ipynb` implementado con:
+- Carga y validación de los 3 YAMLs de configuración
+- Catálogo enriquecido con estadísticas del dataset (min, mediana, max, flags de violación de escala)
+- Matriz de capacidades analíticas por métrica
+- Prueba empírica de ambigüedad de ZONE sola → llave lógica `(COUNTRY, CITY, ZONE)`
+- Evaluación de peer groups: distribución por nivel de confianza (reliable / low_confidence / too_small)
+- Visualización de taxonomía de intents y reglas de lenguaje
+- 10 semantic contract checks (todos deben PASS antes de usar NB 30/40)
+- Export: `reports/reto1/semantic_layer_report.{json,md}`
+
+### Decisiones clave de esta iteración
+
+- `ZONE_KEY = COUNTRY|CITY|ZONE` — materializado en zone_master
+- Peer group primario confirmado: `(COUNTRY, ZONE_TYPE, ZONE_PRIORITIZATION)`
+- Todas las `desired_direction` permanecen como `provisional` — sin validación de negocio aún
+- `lead_penetration` excluida de rankings y benchmarks (outlier extremo 393.9)
+- `turbo_adoption` excluida de peer benchmarks (cobertura <70% en algunos grupos)
+
+### Qué habilita para NB 30
+
+NB 30 puede ahora leer reglas de `config/business_rules.yaml` para los 4 detectores:
+`wow_delta`, `decline_streak`, `vs_peer_median`, `robust_z` — con thresholds provisionales.

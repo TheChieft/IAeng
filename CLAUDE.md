@@ -12,39 +12,43 @@ Raw source: one Excel workbook (`data/raw/*.xlsx`) with three sheets: `RAW_INPUT
 
 ## Running the pipeline
 
-The primary entry point is the notebook. Scripts are gone — all logic is in `notebooks/00_data_prep_common.ipynb`.
+The primary entry point is the notebook. Scripts are gone — all logic is in `notebooks/reto1/00_reto1_data_prep.ipynb`.
 
 ```bash
 # Run full pipeline (Jupyter)
-jupyter notebook notebooks/00_data_prep_common.ipynb
+jupyter notebook notebooks/reto1/00_reto1_data_prep.ipynb
 
 # Or with nbconvert for headless execution
-jupyter nbconvert --to notebook --execute notebooks/00_data_prep_common.ipynb --output 00_data_prep_common.ipynb
+jupyter nbconvert --to notebook --execute notebooks/reto1/00_reto1_data_prep.ipynb --output notebooks/reto1/00_reto1_data_prep.ipynb
 ```
 
 ## Notebook sequence (Reto 1)
 
+All notebooks live in `notebooks/reto1/`.
+
 | Notebook | Purpose |
 |---|---|
-| `00_data_prep_common.ipynb` | Load raw → clean → long → zone_master → validate → export parquets |
+| `00_reto1_data_prep.ipynb` | Load raw → clean → long → zone_master → validate → export parquets |
 | `10_reto1_eda.ipynb` | EDA formal oriented to system design |
-| `20_reto1_semantic_layer.ipynb` | Metric contracts, aggregation rules, query functions (placeholder) |
+| `20_reto1_semantic_layer.ipynb` | Metric catalog, entity keys, peer groups, intent taxonomy, 10 semantic checks |
 | `30_reto1_insight_engine.ipynb` | Transparent detectors: WoW, streaks, peer deviation, robust z (placeholder) |
 | `40_reto1_chatbot_design.ipynb` | Bot architecture: intent → function → narrative (placeholder) |
 
 ## Directory structure
 
 ```
-data/raw/          # immutable source Excel
-data/interim/      # cleaned wide tables (pre-melt): metrics_raw_cleaned, orders_raw_cleaned
-data/processed/    # canonical long tables + zone_master (source of truth for analysis)
-docs/retos/        # case PDFs + problem statements
-docs/research/     # deep research reports
+data/raw/           # immutable source Excel
+data/interim/       # cleaned wide tables (pre-melt): metrics_raw_cleaned, orders_raw_cleaned
+data/processed/     # canonical long tables + zone_master (source of truth for analysis)
+config/             # semantic contracts: metrics.yaml, business_rules.yaml, question_types.yaml
+docs/retos/         # case PDFs + problem statements
+docs/research/      # deep research reports
 docs/working_notes/ # technical bitacora + data prep decisions
-docs/architecture/ # system design (in progress)
-notebooks/         # all work lives here
-reports/reto1/     # auditable output reports (md + json)
-src/helpers/       # paths.py + io.py only — no business logic
+docs/architecture/  # system design (in progress)
+notebooks/reto1/    # Reto 1 notebooks + README
+notebooks/reto2/    # Reto 2 notebooks + README (not started)
+reports/reto1/      # auditable output reports (md + json)
+src/helpers/        # paths.py + io.py only — no business logic
 ```
 
 ## Architecture
@@ -53,12 +57,14 @@ src/helpers/       # paths.py + io.py only — no business logic
 
 ```
 data/raw/*.xlsx
-  └─ 00_data_prep_common.ipynb
+  └─ notebooks/reto1/00_reto1_data_prep.ipynb
        ├─ clean_sheet()          → data/interim/metrics_raw_cleaned.parquet
        ├─ clean_sheet()          → data/interim/orders_raw_cleaned.parquet
        ├─ make_long()            → data/processed/metrics_long.parquet
        ├─ make_long()            → data/processed/orders_long.parquet
        └─ zone_master build      → data/processed/zone_master.parquet
+  └─ notebooks/reto1/20_reto1_semantic_layer.ipynb
+       └─ validates config/*.yaml  → reports/reto1/semantic_layer_report.{json,md}
 ```
 
 ### Key design decisions
@@ -98,9 +104,23 @@ All must PASS before using artifacts downstream:
 | `coverage_mismatch_is_real` | Coverage gap between tables exists (expected) |
 | `processed_outputs_coherent` | SOURCE_TABLE tags and WEEK_OFFSET values correct |
 
+## Semantic layer (config/)
+
+Three YAML files define the semantic contract between data and the insight engine / chatbot:
+- `config/metrics.yaml` — 13 metrics: scale, desired_direction (all `provisional`), outlier_risk
+- `config/business_rules.yaml` — entity keys, peer groups, detector thresholds, language rules
+- `config/question_types.yaml` — 7 intents with required_params, future_function, examples
+
+Key constraints:
+- `ZONE_KEY = COUNTRY|CITY|ZONE` — ZONE alone is not unique
+- Primary peer group: `(COUNTRY, ZONE_TYPE, ZONE_PRIORITIZATION)`, min 10 zones
+- `lead_penetration`: excluded from rankings/benchmarks (outlier max=393.9)
+- `turbo_adoption`: excluded from peer benchmarks (coverage <70% in some groups)
+- `restaurants_markdowns_gmv`: only `lower_is_better` metric — ranking must invert direction
+
 ## Open items
 
-- `20_reto1_semantic_layer.ipynb` — metric catalog (units, direction) not yet defined.
 - `30_reto1_insight_engine.ipynb` — detector thresholds not calibrated per metric.
 - `40_reto1_chatbot_design.ipynb` — bot architecture not implemented.
+- All `desired_direction` values are `provisional` — need business validation before use in narrative.
 - Reto 2 pipeline not started.

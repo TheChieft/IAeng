@@ -1,0 +1,88 @@
+{
+  "generated_at": "2026-04-25T00:24:35.104013",
+  "notebook": "20_reto1_semantic_layer",
+  "semantic_checks": {
+    "all_dataset_metrics_in_catalog": {
+      "status": "PASS",
+      "detail": "dataset=13, catalog=13, missing=set()"
+    },
+    "no_orphan_metrics_in_catalog": {
+      "status": "PASS",
+      "detail": "orphans=set()"
+    },
+    "metric_ids_are_unique": {
+      "status": "PASS",
+      "detail": "n_ids=13, n_unique=13"
+    },
+    "all_metrics_have_direction": {
+      "status": "PASS",
+      "detail": "all entries have desired_direction field"
+    },
+    "all_metrics_have_confidence": {
+      "status": "PASS",
+      "detail": "all entries have direction_confidence field"
+    },
+    "zone_key_is_unique": {
+      "status": "PASS",
+      "detail": "n_zone_keys=1244"
+    },
+    "peer_groups_have_reliable_groups": {
+      "status": "PASS",
+      "detail": "reliable_groups=25, total_groups=43"
+    },
+    "intents_have_required_params": {
+      "status": "PASS",
+      "detail": "n_intents=8"
+    },
+    "intents_have_examples": {
+      "status": "PASS",
+      "detail": ""
+    },
+    "scale_violations_documented": {
+      "status": "PASS",
+      "detail": "violations=none"
+    }
+  },
+  "catalog_summary": {
+    "n_metrics_in_catalog": 13,
+    "n_metrics_in_dataset": 13,
+    "direction_distribution": {
+      "higher_is_better": 12,
+      "lower_is_better": 1
+    },
+    "confidence_distribution": {
+      "provisional": 13
+    },
+    "outlier_risk_distribution": {
+      "low": 11,
+      "high": 2
+    }
+  },
+  "peer_group_summary": {
+    "total_groups": 43,
+    "reliable_groups": 25,
+    "low_confidence_groups": 7,
+    "too_small_groups": 11,
+    "min_size_threshold": 10
+  },
+  "intent_summary": {
+    "n_intents": 8,
+    "support_levels": {
+      "query": "bien",
+      "aggregate": "bien",
+      "rank": "bien",
+      "trend": "bien",
+      "compare": "bien",
+      "multivariable_filter": "parcial",
+      "insight_request": "parcial",
+      "hypothesis_request": "parcial"
+    }
+  },
+  "open_items": [
+    "Todas las direcciones de métricas son provisionales — requieren validación de negocio",
+    "Thresholds de detectores en business_rules.yaml pendientes de calibración por métrica",
+    "lead_penetration excluida de rankings y benchmarks hasta clarificar denominador",
+    "turbo_adoption excluida de peer benchmarks por baja cobertura (<70% en algunos grupos)",
+    "Peer groups con low_confidence o too_small producirán alertas low_confidence en NB 30"
+  ]
+}
