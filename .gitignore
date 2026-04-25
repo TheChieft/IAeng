@@ -1,0 +1,9 @@
+# Python cache artifacts
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+
+# Optional ad-hoc exports (Parquet is source of truth in processed)
+data/processed/*.csv

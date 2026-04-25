@@ -1,0 +1,67 @@
+{
+  "excel_path": "/home/thechieft/projects/IAeng/data/raw/Sistema de An\u00e1lisis Inteligente para Operaciones Rappi - Dummy Data (1).xlsx",
+  "sheets": {
+    "RAW_INPUT_METRICS": {
+      "shape": [
+        12573,
+        15
+      ],
+      "columns": [
+        "COUNTRY",
+        "CITY",
+        "ZONE",
+        "ZONE_TYPE",
+        "ZONE_PRIORITIZATION",
+        "METRIC",
+        "L8W_ROLL",
+        "L7W_ROLL",
+        "L6W_ROLL",
+        "L5W_ROLL",
+        "L4W_ROLL",
+        "L3W_ROLL",
+        "L2W_ROLL",
+        "L1W_ROLL",
+        "L0W_ROLL"
+      ],
+      "blank_rows": 0,
+      "exact_duplicates": 963
+    },
+    "RAW_ORDERS": {
+      "shape": [
+        1242,
+        13
+      ],
+      "columns": [
+        "COUNTRY",
+        "CITY",
+        "ZONE",
+        "METRIC",
+        "L8W",
+        "L7W",
+        "L6W",
+        "L5W",
+        "L4W",
+        "L3W",
+        "L2W",
+        "L1W",
+        "L0W"
+      ],
+      "blank_rows": 0,
+      "exact_duplicates": 0
+    },
+    "RAW_SUMMARY": {
+      "shape": [
+        15,
+        4
+      ],
+      "columns": [
+        "COLUMN",
+        "TYPE",
+        "EXAMPLES",
+        "DESCRIPTION_(INFERRED)"
+      ],
+      "blank_rows": 0,
+      "exact_duplicates": 0
+    }
+  }
+}

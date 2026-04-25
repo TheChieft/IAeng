@@ -1,0 +1,150 @@
+{
+  "overall_status": "PASS",
+  "checks_passed": 10,
+  "checks_failed": 0,
+  "checks": [
+    {
+      "id": "raw_shapes_match_source",
+      "status": "PASS",
+      "details": {
+        "RAW_INPUT_METRICS": [
+          12573,
+          15
+        ],
+        "RAW_ORDERS": [
+          1242,
+          13
+        ],
+        "RAW_SUMMARY": [
+          15,
+          4
+        ]
+      }
+    },
+    {
+      "id": "metrics_exact_duplicates_real",
+      "status": "PASS",
+      "details": {
+        "raw_exact_duplicates": 963,
+        "expected": 963
+      }
+    },
+    {
+      "id": "dedup_preserves_non_exact_rows",
+      "status": "PASS",
+      "details": {
+        "raw_unique_rows": 11610,
+        "metrics_clean_rows": 11610
+      }
+    },
+    {
+      "id": "weekly_mapping_columns_detected",
+      "status": "PASS",
+      "details": {
+        "metrics_has_roll_cols": true,
+        "orders_has_week_cols": true
+      }
+    },
+    {
+      "id": "numeric_coercion_no_artificial_nans",
+      "status": "PASS",
+      "details": {
+        "metrics_artificial_nans": {
+          "L8W": 0,
+          "L7W": 0,
+          "L6W": 0,
+          "L5W": 0,
+          "L4W": 0,
+          "L3W": 0,
+          "L2W": 0,
+          "L1W": 0,
+          "L0W": 0
+        },
+        "orders_artificial_nans": {
+          "L8W": 0,
+          "L7W": 0,
+          "L6W": 0,
+          "L5W": 0,
+          "L4W": 0,
+          "L3W": 0,
+          "L2W": 0,
+          "L1W": 0,
+          "L0W": 0
+        }
+      }
+    },
+    {
+      "id": "wide_to_long_math_and_grain",
+      "status": "PASS",
+      "details": {
+        "metrics_expected_rows": 104490,
+        "metrics_actual_rows": 104490,
+        "orders_expected_rows": 11178,
+        "orders_actual_rows": 11178,
+        "metrics_grain_duplicates": 0,
+        "orders_grain_duplicates": 0
+      }
+    },
+    {
+      "id": "zone_master_matches_union",
+      "status": "PASS",
+      "details": {
+        "zone_master_count": 1244,
+        "union_count": 1244,
+        "metrics_only": 2,
+        "orders_only": 264
+      }
+    },
+    {
+      "id": "coverage_mismatch_warning_real",
+      "status": "PASS",
+      "details": {
+        "metrics_only": 2,
+        "orders_only": 264
+      }
+    },
+    {
+      "id": "processed_outputs_coherent",
+      "status": "PASS",
+      "details": {
+        "metrics_source_tables": [
+          "RAW_INPUT_METRICS"
+        ],
+        "orders_source_tables": [
+          "RAW_ORDERS"
+        ],
+        "metrics_week_offsets": [
+          "L0W",
+          "L1W",
+          "L2W",
+          "L3W",
+          "L4W",
+          "L5W",
+          "L6W",
+          "L7W",
+          "L8W"
+        ],
+        "orders_week_offsets": [
+          "L0W",
+          "L1W",
+          "L2W",
+          "L3W",
+          "L4W",
+          "L5W",
+          "L6W",
+          "L7W",
+          "L8W"
+        ]
+      }
+    },
+    {
+      "id": "pipeline_end_to_end_no_manual_steps",
+      "status": "PASS",
+      "details": {
+        "run_pipeline": true,
+        "return_code": 0,
+        "stderr_tail": ""
+      }
+    }
+  ]
+}

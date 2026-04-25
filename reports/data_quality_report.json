@@ -1,0 +1,202 @@
+{
+  "raw_schema": {
+    "excel_path": "/home/thechieft/projects/IAeng/data/raw/Sistema de Análisis Inteligente para Operaciones Rappi - Dummy Data (1).xlsx",
+    "sheets": {
+      "RAW_INPUT_METRICS": {
+        "shape": [
+          12573,
+          15
+        ],
+        "columns": [
+          "COUNTRY",
+          "CITY",
+          "ZONE",
+          "ZONE_TYPE",
+          "ZONE_PRIORITIZATION",
+          "METRIC",
+          "L8W_ROLL",
+          "L7W_ROLL",
+          "L6W_ROLL",
+          "L5W_ROLL",
+          "L4W_ROLL",
+          "L3W_ROLL",
+          "L2W_ROLL",
+          "L1W_ROLL",
+          "L0W_ROLL"
+        ],
+        "blank_rows": 0,
+        "exact_duplicates": 963
+      },
+      "RAW_ORDERS": {
+        "shape": [
+          1242,
+          13
+        ],
+        "columns": [
+          "COUNTRY",
+          "CITY",
+          "ZONE",
+          "METRIC",
+          "L8W",
+          "L7W",
+          "L6W",
+          "L5W",
+          "L4W",
+          "L3W",
+          "L2W",
+          "L1W",
+          "L0W"
+        ],
+        "blank_rows": 0,
+        "exact_duplicates": 0
+      },
+      "RAW_SUMMARY": {
+        "shape": [
+          15,
+          4
+        ],
+        "columns": [
+          "COLUMN",
+          "TYPE",
+          "EXAMPLES",
+          "DESCRIPTION_(INFERRED)"
+        ],
+        "blank_rows": 0,
+        "exact_duplicates": 0
+      }
+    }
+  },
+  "metrics_profile": {
+    "source_table": "RAW_INPUT_METRICS",
+    "raw_shape": [
+      12573,
+      15
+    ],
+    "blank_rows_removed": 0,
+    "exact_duplicates_removed": 963,
+    "week_column_mapping": {
+      "L0W_ROLL": "L0W",
+      "L1W_ROLL": "L1W",
+      "L2W_ROLL": "L2W",
+      "L3W_ROLL": "L3W",
+      "L4W_ROLL": "L4W",
+      "L5W_ROLL": "L5W",
+      "L6W_ROLL": "L6W",
+      "L7W_ROLL": "L7W",
+      "L8W_ROLL": "L8W"
+    },
+    "numeric_coercion_failures": {
+      "L8W": 0,
+      "L7W": 0,
+      "L6W": 0,
+      "L5W": 0,
+      "L4W": 0,
+      "L3W": 0,
+      "L2W": 0,
+      "L1W": 0,
+      "L0W": 0
+    },
+    "missing_by_column_after_clean": {
+      "L8W": 102,
+      "L8W_ROLL": 102,
+      "L6W": 100,
+      "L6W_ROLL": 100,
+      "L7W": 98,
+      "L7W_ROLL": 98,
+      "L5W": 97,
+      "L5W_ROLL": 97,
+      "L4W": 87,
+      "L4W_ROLL": 87,
+      "L3W_ROLL": 60,
+      "L3W": 60,
+      "L2W_ROLL": 47,
+      "L2W": 47,
+      "L1W": 36,
+      "L1W_ROLL": 36
+    },
+    "clean_shape": [
+      11610,
+      32
+    ]
+  },
+  "orders_profile": {
+    "source_table": "RAW_ORDERS",
+    "raw_shape": [
+      1242,
+      13
+    ],
+    "blank_rows_removed": 0,
+    "exact_duplicates_removed": 0,
+    "week_column_mapping": {
+      "L0W": "L0W",
+      "L1W": "L1W",
+      "L2W": "L2W",
+      "L3W": "L3W",
+      "L4W": "L4W",
+      "L5W": "L5W",
+      "L6W": "L6W",
+      "L7W": "L7W",
+      "L8W": "L8W"
+    },
+    "numeric_coercion_failures": {
+      "L8W": 0,
+      "L7W": 0,
+      "L6W": 0,
+      "L5W": 0,
+      "L4W": 0,
+      "L3W": 0,
+      "L2W": 0,
+      "L1W": 0,
+      "L0W": 0
+    },
+    "missing_by_column_after_clean": {
+      "L1W": 248,
+      "L0W": 244,
+      "L3W": 243,
+      "L2W": 242,
+      "L4W": 239,
+      "L5W": 226,
+      "L8W": 221,
+      "L6W": 221,
+      "L7W": 220
+    },
+    "clean_shape": [
+      1242,
+      19
+    ]
+  },
+  "long_stats": {
+    "metrics_long": {
+      "input_rows": 11610,
+      "output_rows": 104490,
+      "week_cols": 9
+    },
+    "orders_long": {
+      "input_rows": 1242,
+      "output_rows": 11178,
+      "week_cols": 9
+    }
+  },
+  "zone_stats": {
+    "zone_master_rows": 1244,
+    "zones_in_both": 978,
+    "zones_only_metrics": 2,
+    "zones_only_orders": 264,
+    "zone_type_conflicts": 0,
+    "zone_prioritization_conflicts": 0
+  },
+  "zone_overlap": {
+    "zones_total": 1244,
+    "zones_both": 978,
+    "zones_only_metrics": 2,
+    "zones_only_orders": 264
+  },
+  "non_exact_duplicate_keys": {
+    "metrics": 0,
+    "orders": 0
+  },
+  "warnings": [
+    "Metrics had 963 exact duplicate rows removed.",
+    "Zone coverage differs between metrics and orders tables."
+  ]
+}
