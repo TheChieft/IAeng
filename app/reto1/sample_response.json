@@ -1,0 +1,44 @@
+{
+  "_comment": "Sample UI response object for MVP02 (compare segments)",
+  "answer_short": "En México (L0W), las zonas Wealthy tienen una mediana de Perfect Orders de 0.834 frente a 0.791 en Non Wealthy — diferencia de +0.043.",
+  "headline_metric": "Perfect Orders: Wealthy=0.834 vs Non Wealthy=0.791 (+0.043)",
+  "supporting_evidence": [
+    {"segment": "Wealthy",     "value": 0.834, "n_zones": 34, "confidence_level": "reliable"},
+    {"segment": "Non Wealthy", "value": 0.791, "n_zones": 45, "confidence_level": "reliable"}
+  ],
+  "filters_used": {
+    "country": "MX",
+    "dimension": "ZONE_TYPE",
+    "week_offset": "L0W",
+    "agg_func": "median"
+  },
+  "chart_spec": {
+    "chart_type": "side_by_side_bar",
+    "x_values": ["Wealthy", "Non Wealthy"],
+    "y_values": [0.834, 0.791],
+    "series_labels": ["Perfect Orders mediana L0W"],
+    "title": "Perfect Orders: Wealthy vs Non Wealthy — MX L0W",
+    "annotations": [{"x": "Wealthy", "label": "n=34"}, {"x": "Non Wealthy", "label": "n=45"}]
+  },
+  "caveat": "Dirección de Perfect Orders provisional — no validada con negocio. La definición de 'perfecto' puede variar si los SLAs difieren entre mercados.",
+  "suggested_followups": [
+    "¿Ver tendencia de cada segmento en las últimas 8 semanas?",
+    "¿Filtrar solo zonas High Priority?",
+    "¿Y solo en Colombia?"
+  ],
+  "intent_classified": "compare",
+  "tool_calls_made": ["compare_segments"],
+  "debug_meta": {
+    "plan": {
+      "intent": "compare",
+      "metric": "perfect_orders",
+      "entity_scope": {"country": "MX", "segment": "ZONE_TYPE"},
+      "comparison": {"segment_a": "Wealthy", "segment_b": "Non Wealthy", "dimension": "ZONE_TYPE"},
+      "time_window": "L0W",
+      "requires_clarification": false,
+      "_add_provisional_caveat": true,
+      "_provisional_metric_display": "Perfect Orders"
+    },
+    "validation_result": {"valid": true, "action": "execute"}
+  }
+}

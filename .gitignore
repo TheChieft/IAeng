@@ -4,6 +4,8 @@ __pycache__/
 
 # Virtual environment
 .venv/
+.env/
 
 # Optional ad-hoc exports (Parquet is source of truth in processed)
 data/processed/*.csv
+.env

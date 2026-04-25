@@ -33,6 +33,66 @@ Repositorio para la prueba técnica de Rappi. Dos retos que comparten base de da
 
 ---
 
+## Demo Streamlit — Reto 1
+
+### Prerrequisitos
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install pandas pyarrow pyyaml streamlit plotly nbconvert
+```
+
+### Correr la app
+
+```bash
+# desde la raíz del repo
+source .venv/bin/activate
+streamlit run app/reto1/app.py
+```
+
+Abre en `http://localhost:8501`.
+
+### Artifacts requeridos (ya generados)
+
+| Archivo | Ubicación |
+|---|---|
+| `metrics_long.parquet` | `data/processed/` |
+| `zone_master.parquet` | `data/processed/` |
+| `streamlit_insights.parquet` | `reports/reto1/` |
+| `top_insights_final.parquet` | `reports/reto1/` |
+| `insight_candidates.parquet` | `reports/reto1/` |
+| `metrics.yaml`, `business_rules.yaml`, `question_types.yaml` | `config/` |
+
+Si necesitas regenerar los artifacts de insights:
+
+```bash
+source .venv/bin/activate
+jupyter nbconvert --to notebook --execute --output-dir . \
+    notebooks/reto1/30_reto1_insight_engine.ipynb
+mv 30_reto1_insight_engine.ipynb notebooks/reto1/
+```
+
+### Preguntas soportadas
+
+| Tipo | Ejemplo |
+|---|---|
+| Ranking | *Top 5 zonas por Perfect Orders en MX* |
+| Comparación | *Compara Wealthy vs Non Wealthy en CO* |
+| Tendencia | *Tendencia de Turbo Adoption en MX* |
+| Insights | *Qué problemas tiene Argentina* |
+| Hipótesis | *Qué podría explicar el crecimiento en MX* |
+| Follow-up | *Solo en Colombia* · *Muéstralo en gráfico* |
+
+### Limitaciones conocidas
+
+- Dirección de todas las métricas es `provisional` — no validada con negocio.
+- `lead_penetration` suspendida — el chatbot la rechaza con mensaje.
+- Planner es keyword-based (Fase 1). LLM optional: `LLM_PROVIDER=anthropic LLM_API_KEY=sk-... streamlit run ...`
+- Turbo Adoption excluido de benchmarks de peer group (cobertura baja).
+- Sin fechas calendario — solo offsets relativos L0W–L8W.
+
+---
+
 ## Flujo de trabajo recomendado
 
 ### Reto 1
@@ -51,8 +111,8 @@ Incluye validación de 10 checks al final — todos deben ser PASS.
 ```
 notebooks/reto1/10_reto1_eda.ipynb              # EDA formal orientado a diseño del sistema
 notebooks/reto1/20_reto1_semantic_layer.ipynb   # Capa semántica y contratos de métricas
-notebooks/reto1/30_reto1_insight_engine.ipynb   # Detectores de anomalías y alertas [placeholder]
-notebooks/reto1/40_reto1_chatbot_design.ipynb   # Arquitectura del bot conversacional [placeholder]
+notebooks/reto1/30_reto1_insight_engine.ipynb   # Detectores de anomalías, curation, Streamlit outputs
+notebooks/reto1/40_reto1_chatbot_design.ipynb   # Arquitectura del bot, tool contracts, golden flows
 ```
 
 Ver `notebooks/reto1/README.md` para documentación completa del flujo.

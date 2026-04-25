@@ -456,3 +456,71 @@ User input → LLM Planner → validate_plan() → tool calls → LLM Renderer (
 4. **Golden flow tests**: pipeline de evaluación automática (intent accuracy, groundedness)
 5. **App shell**: Streamlit o equivalente consumiendo contratos definidos en NB40
 6. **Calibración de thresholds**: antes de activar `insight_request` en producción
+
+---
+
+## Iteración 8 — 2026-04-25: Poda de ruido, blueprints implementables, scaffold Streamlit
+
+### Mejoras puntuales en NB30 (30 → 33 celdas)
+
+**Problema:** 12,443 candidatos de insight, 5,311 posibles_driver (43%) con threshold abs_rho >= 0.25 — demasiado ruidoso para demo.
+
+**4 reglas de poda implementadas (cell `nb30-curation`):**
+
+| Regla | Efecto |
+|---|---|
+| Rule 1: abs_rho >= 0.35 AND confidence_score >= 0.55 | Elimina drivers débiles |
+| Rule 2: top-1 driver per entity (highest abs_rho) | 937 entities × avg 5.6 → 1 driver each |
+| Rule 3: max 2 insights per (entity, category) | Elimina redundancia intra-entidad |
+| Rule 4: redundancy penalty 0.85x si entity tiene >3 insights | Protege el ranking de zonas saturadas |
+
+**Outputs nuevos (cell `nb30-streamlit`):**
+- `top_insights_final.parquet/csv/md` — curated_top (100 rows) para revisión
+- `streamlit_insights.parquet/csv` — schema UI-ready con `summary_text`, `chart_hint`, `drilldown_payload`
+
+**Edge case validation (cell `nb30-edge-cases`):**
+- 6 checks: suspended metrics absent, lower_is_better respected, too_small caveat, provisional caveat, no causal language, association_not_causation caveat
+
+### Mejoras puntuales en NB40 (33 → 38 celdas)
+
+| Celda | Qué agrega |
+|---|---|
+| `nb40-tool-detail` | 9 tool contracts implementables: input/output schema, errors, caveats, depends_on, nb30=bool |
+| `nb40-validate-v2` | validate_plan v2: +not_comparable check, +cross-country ZONE_TYPE guard, +viz fallback, 6 demo cases |
+| `nb40-response-ui` | UI_RESPONSE_SCHEMA + 3 example responses (query, rank, insight_request) |
+| `nb40-nb30-connect` | Conexión explícita: qué 3 NB30 artifacts usa el chatbot, con schema y freshness check |
+| `nb40-golden-mvp` | 6 MVP golden flows prioritizados por demo value (3 priority-1, 3 priority-2) |
+
+### App scaffold creado (app/reto1/)
+
+| Archivo | Contenido |
+|---|---|
+| `app/reto1/ui_schema.json` | Componentes Streamlit, chart types, severity colors, session state keys |
+| `app/reto1/sample_state.json` | Ejemplo de ChatSessionState post GF02 |
+| `app/reto1/sample_response.json` | Ejemplo de UI response completo (compare intent) |
+
+### Documentos de arquitectura
+
+| Archivo | Contenido |
+|---|---|
+| `docs/architecture/reto1_streamlit_contract.md` | Pantallas MVP, orden de implementación (8 fases), what's ready vs blocked |
+| `reports/reto1/streamlit_integration_notes.md` | Snippets de código para data_loader, response schema, severity colors, qué no hacer |
+
+### Qué está listo para implementación
+
+- Semantic contract completo (config/*.yaml + NB20 checks)
+- Planner schema (chatbot_planner_schema.json)
+- 9 tool contracts implementables (NB40 nb40-tool-detail)
+- validate_plan_v2() function (NB40)
+- 3 language guard functions (NB40)
+- UI response schema + sample response
+- streamlit_insights.parquet schema definido
+- 6 MVP golden flows para tests
+
+### Qué falta para empezar a implementar
+
+1. Ejecutar NB30 para regenerar insight_candidates con las nuevas reglas de poda
+2. Implementar `app/reto1/data_loader.py`, `tools.py`, `renderer.py`, `app.py`
+3. Planner LLM prompt (structured output para ChatbotExecutionPlan)
+4. Validar desired_direction de 13 métricas con negocio
+5. Calibrar thresholds de detectores NB30

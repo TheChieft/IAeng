@@ -1,6 +1,6 @@
 # Insight Engine Report - Reto 1
 
-Generado: 2026-04-25T12:38:19.230051
+Generado: 2026-04-25T14:58:02.264137
 
 ## Resumen
 - n_candidates: 12443

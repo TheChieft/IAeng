@@ -1,0 +1,27 @@
+{
+  "_comment": "Sample ChatSessionState after GF02 (compare Perfect Orders MX)",
+  "last_metric_id": "perfect_orders",
+  "last_entity": {
+    "country": "MX",
+    "city": null,
+    "zone": null,
+    "segment": "ZONE_TYPE"
+  },
+  "last_filters": [
+    {"field": "COUNTRY", "value": "MX"}
+  ],
+  "last_comparison": {
+    "segment_a": "Wealthy",
+    "segment_b": "Non Wealthy",
+    "dimension": "ZONE_TYPE"
+  },
+  "last_time_window": "L0W",
+  "mode": "direct_answer",
+  "last_visualization": "side_by_side_bar",
+  "last_tool_result": {
+    "tool": "compare_segments",
+    "segment_a": {"value": 0.834, "n_zones": 34, "confidence_level": "reliable"},
+    "segment_b": {"value": 0.791, "n_zones": 45, "confidence_level": "reliable"},
+    "delta": 0.043
+  }
+}

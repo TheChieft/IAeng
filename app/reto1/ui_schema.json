@@ -1,0 +1,80 @@
+{
+  "_comment": "UI schema for Streamlit MVP — Reto 1 Operational Intelligence",
+  "_generated": "2026-04-25",
+
+  "app_title": "Rappi Operational Intelligence — Reto 1",
+  "app_description": "Chatbot analítico gobernado sobre métricas operativas semanales por zona.",
+
+  "data_sources": {
+    "streamlit_insights": "reports/reto1/streamlit_insights.parquet",
+    "top_insights_final": "reports/reto1/top_insights_final.parquet",
+    "insight_candidates": "reports/reto1/insight_candidates.parquet",
+    "metrics_long":       "data/processed/metrics_long.parquet",
+    "orders_long":        "data/processed/orders_long.parquet",
+    "zone_master":        "data/processed/zone_master.parquet",
+    "metrics_yaml":       "config/metrics.yaml",
+    "business_rules":     "config/business_rules.yaml",
+    "question_types":     "config/question_types.yaml"
+  },
+
+  "components": {
+    "chat_input": {
+      "type": "st.chat_input",
+      "placeholder": "Pregunta sobre métricas operativas de zonas Rappi...",
+      "max_chars": 500
+    },
+    "response_pane": {
+      "sections": [
+        {"id": "answer_short",        "type": "st.markdown",    "label": "Respuesta"},
+        {"id": "headline_metric",     "type": "st.metric",      "label": "Métrica principal"},
+        {"id": "supporting_evidence", "type": "st.dataframe",   "label": "Evidencia"},
+        {"id": "chart_spec",          "type": "st.plotly_chart","label": "Gráfico"},
+        {"id": "caveat",              "type": "st.warning",     "label": "Aviso"},
+        {"id": "suggested_followups", "type": "st.button[]",    "label": "Preguntas sugeridas"}
+      ]
+    },
+    "debug_panel": {
+      "type": "st.expander",
+      "label": "Debug / Meta",
+      "visible_default": false,
+      "fields": ["intent_classified", "tool_calls_made", "plan", "filters_used"]
+    },
+    "sidebar": {
+      "sections": [
+        {"id": "metric_filter",  "type": "st.selectbox",  "options": "from metrics.yaml"},
+        {"id": "country_filter", "type": "st.selectbox",  "options": "from zone_master"},
+        {"id": "week_filter",    "type": "st.selectbox",  "options": ["L0W","L1W","L2W","L3W","L4W","L8W"]},
+        {"id": "insight_panel",  "type": "st.expander",   "label": "Top insights activos"}
+      ]
+    }
+  },
+
+  "chart_types": {
+    "kpi_card":         "st.metric",
+    "line_chart":       "st.line_chart / plotly line",
+    "bar_chart":        "st.bar_chart / plotly bar",
+    "ranked_table":     "st.dataframe with highlight",
+    "side_by_side_bar": "plotly grouped bar",
+    "comparison_bar":   "plotly bar with reference line",
+    "alert_cards":      "st.columns with colored metric cards",
+    "correlation_table":"st.dataframe"
+  },
+
+  "severity_colors": {
+    "HIGH":   "#FF4B4B",
+    "MEDIUM": "#FFA500",
+    "LOW":    "#4CAF50"
+  },
+
+  "session_state_keys": [
+    "last_metric_id",
+    "last_entity",
+    "last_filters",
+    "last_comparison",
+    "last_time_window",
+    "mode",
+    "last_visualization",
+    "conversation_history",
+    "last_tool_result"
+  ]
+}
