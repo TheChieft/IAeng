@@ -310,8 +310,16 @@ TOOL_DISPATCH: dict[str, callable] = {
 }
 
 
+_TERMINAL_INTENTS = {
+    "greeting", "help", "no_intent", "about_data",
+    "explain_result", "explain_metric", "explain_table", "no_intent_guided",
+}
+
+
 def run_tool(plan: dict, artifacts: dict) -> dict:
     intent = plan.get("intent", "insight_request")
+    if intent in _TERMINAL_INTENTS:
+        return {"tool": "none", "rows": [], "intent": intent}
     fn = TOOL_DISPATCH.get(intent)
     if fn is None:
         return {"tool": "unknown", "error": f"No tool for intent '{intent}'", "rows": []}

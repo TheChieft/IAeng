@@ -39,18 +39,30 @@ Repositorio para la prueba técnica de Rappi. Dos retos que comparten base de da
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install pandas pyarrow pyyaml streamlit plotly nbconvert
+pip install pandas pyarrow pyyaml streamlit plotly nbconvert python-dotenv google-genai
 ```
+
+### Configurar LLM (opcional — Gemini)
+
+```bash
+cp .env.example .env
+# edita .env y pon tu GEMINI_API_KEY
+```
+
+`.env` está en `.gitignore` — nunca se commitea.
+
+Para desactivar Gemini sin borrar la key: `USE_LLM=false` en `.env`.
 
 ### Correr la app
 
 ```bash
 # desde la raíz del repo
 source .venv/bin/activate
-streamlit run app/reto1/app.py
+streamlit run app/reto1/streamlit_app.py
 ```
 
-Abre en `http://localhost:8501`.
+Abre en `http://localhost:8501`.  
+Sin `.env`, corre con planner por keywords (100% funcional).
 
 ### Artifacts requeridos (ya generados)
 

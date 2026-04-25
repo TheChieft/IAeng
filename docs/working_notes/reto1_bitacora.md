@@ -524,3 +524,75 @@ User input → LLM Planner → validate_plan() → tool calls → LLM Renderer (
 3. Planner LLM prompt (structured output para ChatbotExecutionPlan)
 4. Validar desired_direction de 13 métricas con negocio
 5. Calibrar thresholds de detectores NB30
+
+---
+
+## Iteración de cierre — Reto 1 MVP (Abril 2026)
+
+### Estado final del producto
+
+App Streamlit completa y demoable en `app/reto1/streamlit_app.py`.
+Comando: `streamlit run app/reto1/streamlit_app.py`
+
+### Intents implementados (10 total)
+
+| Intent | Trigger ejemplo | Handler |
+|---|---|---|
+| `greeting` | "Hola", "buenas tardes" | Bienvenida + capacidades |
+| `help` | "ayuda", "qué puedes hacer" | Lista de capacidades completa |
+| `about_data` | "háblame de la data" | Dataset: países, métricas, cobertura, límites |
+| `explain_metric` | "qué significa Perfect Orders" | Descripción desde metrics.yaml + dirección + cautelas |
+| `explain_table` | "qué es n_zones", "explícame la evidencia" | Glosario contextual de columnas |
+| `explain_result` | "explícame esto", "por qué importa" | Interpreta último resultado (insight/compare/trend) del session state |
+| `no_intent_guided` | texto vago sin intent claro | Guía con ejemplos — no error técnico |
+| `rank` | "Top 5 zonas por..." | Ranking con zona líder destacada |
+| `compare` | "Compara Wealthy vs Non Wealthy" | Comparación con winner y nota de confianza |
+| `trend` | "Tendencia de X en Y" | Tendencia con Δ y % de cambio |
+| `insight_request` | "Qué problemas tiene Argentina" | Narración ejecutiva + reporte expandible |
+| `hypothesis_request` | "Qué hipótesis explican..." | Drivers con caveat de no-causalidad |
+| `query` | "Cuál es la mediana de..." | Agregado con n zonas |
+
+### Correcciones de ingeniería
+
+1. **signal.SIGALRM bug** — reemplazado por `concurrent.futures.ThreadPoolExecutor` para timeout Gemini, thread-safe en Streamlit workers.
+2. **Fallback agresivo** — `else: intent = "insight_request"` → `else: intent = "no_intent_guided"`.
+3. **_GREETING_CONVERSATIONAL_RE** — captura "Hola Gemini, como estas?" que el regex base no detectaba.
+4. **Terminal intents** — set consistente en planner, tools, renderer y streamlit_app. No tool call, no state update, no `tool_error` en debug.
+5. **State preservation** — `scope.get("country") or state.last_entity.get("country")` evita sobreescribir con None.
+
+### Mejoras de memoria conversacional
+
+`ChatSessionState` ampliado con:
+- `last_compare_result` — resultado completo de compare_segments
+- `last_trend_result` — resultado completo de get_trend
+- `last_result_type` — intent del último turno analítico
+- `last_summary_text` — texto del top insight
+
+`build_plan_from_action()` ahora soporta `explain_top_insight` → `explain_result` con contexto completo del insight.
+
+### Mejoras de renderer
+
+- `insight_request`: narración ejecutiva ("Alerta crítica en AR" en vez de "100 hallazgos encontrados"). Reporte expandible con severity filter.
+- `compare`: añade winner + nota de confianza del peer group.
+- `trend`: añade % de cambio.
+- `query`: añade n zonas en el texto.
+- `explain_result`: branch por tipo de resultado anterior (insight/compare/trend).
+- Todos los intents terminales: `tool_calls_made=[]` y `tool_error=None` garantizados.
+
+### Glosario / ayuda en sidebar
+
+Cuatro expanders en sidebar:
+- "Qué datos usamos" — países, semanas, zonas
+- "Métricas principales" — tabla dirección por métrica
+- "Cómo leer los resultados" — columnas VALUE/n_zones/confidence/delta/severity
+- "Limitaciones importantes" — caveats del sistema
+
+### Limitaciones abiertas
+
+1. `desired_direction` de 13 métricas — todas provisionales, sin validación de negocio.
+2. Detector thresholds (NB30) no calibrados por métrica — umbrales genéricos.
+3. `lead_penetration` suspendida — definición pendiente.
+4. Gemini planner requiere `.env` con `USE_LLM=true` + `GEMINI_API_KEY`. Sin clave → keyword fallback.
+5. Sin fechas calendario — solo offsets L0W–L8W.
+6. Hipótesis detectadas son asociaciones estadísticas — no causalidad.
+7. ~264 zonas en orders sin cobertura en métricas operativas.

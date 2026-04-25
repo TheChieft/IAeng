@@ -1,13 +1,119 @@
 """Intent classifier and plan extractor.
 
-Phase 1: keyword/regex based (no LLM required).
-Phase 2: LLM structured output (optional, enabled via config.USE_LLM).
+Phase 1 (always active): keyword/regex router — deterministic, thread-safe.
+Phase 2 (optional): Gemini structured output — enabled via .env.
+
+build_plan() always returns a valid plan. Gemini failure → keyword fallback.
+Timeout uses concurrent.futures (thread-safe) — signal.SIGALRM not used.
 """
 from __future__ import annotations
+import json
 import re
-from app.reto1.config import USE_LLM, SUSPENDED_METRICS
+import logging
+import concurrent.futures
+from app.reto1.config import LLM_ACTIVE, SUSPENDED_METRICS, GEMINI_API_KEY, GEMINI_MODEL, LLM_TIMEOUT_SECONDS
 
-# ── keyword maps ────────────────────────────────────────────────────────────
+logger = logging.getLogger(__name__)
+
+# ── terminal / UX intent detection ───────────────────────────────────────────
+
+_GREETING_RE = re.compile(
+    r"^\s*(hola|hi|hello|buenos\s*días|buenas\s*tardes|buenas\s*noches|buenas|hey|saludos|"
+    r"qué\s*tal|cómo\s*estás?|como\s*estas?|good\s*morning|good\s*afternoon|"
+    r"hola\s+\w+|hey\s+\w+)\s*[!?.,]?\s*$",
+    re.IGNORECASE,
+)
+# catches "Hola Gemini, como estas?" and similar multi-word greetings
+_GREETING_CONVERSATIONAL_RE = re.compile(
+    r"^\s*(hola|hey|hi)\s+\w+[,.]?\s*(como|cómo)\s+estas?[!?.]?\s*$",
+    re.IGNORECASE,
+)
+_VAGUE_RE = re.compile(
+    r"^\s*(ok|okay|bien|gracias|thanks|thank\s*you|si|sí|no|perfecto|entendido|claro|dale|listo)\s*[!?.,]?\s*$",
+    re.IGNORECASE,
+)
+_HELP_RE = re.compile(
+    r"\b(ayuda|help|qué\s*puedes|que\s*puedes|cómo\s*funciona|como\s*funciona|"
+    r"qué\s*soportas|que\s*soportas|qué\s*preguntas|que\s*preguntas|"
+    r"capacidades|capabilities|qué\s*haces|que\s*haces|para\s*qué\s*sirves|"
+    r"para\s*que\s*sirves|qué\s*puedo\s*preguntar|que\s*puedo\s*preguntar)\b",
+    re.IGNORECASE,
+)
+_ABOUT_DATA_RE = re.compile(
+    r"\b(háblame|cuéntame|qué\s*datos|cuáles\s*datos|sobre\s*la\s*data|de\s*qué\s*trata|"
+    r"qué\s*información\s*tenemos|qué\s*métricas\s*tenemos|qué\s*data|explica.*data|"
+    r"describe.*dataset|qué\s*cubre|qué\s*tiene.*data|qué\s*contiene.*data|"
+    r"data\s*que\s*tenemos|datos\s*que\s*tenemos|dataset)\b",
+    re.IGNORECASE,
+)
+_EXPLAIN_RE = re.compile(
+    r"\b(explícame|explica\s*esto|qué\s*significa\s*(esto|eso|este\s+\w+)|por\s*qué\s*importa|"
+    r"qué\s*quiere\s*decir|qué\s*implica|cómo\s*lo\s*interpreto|"
+    r"qué\s*tan\s*grave|dime\s*más\s*sobre|amplía|profundiza|detalla|"
+    r"explica\s*el\s*resultado|explica\s*el\s*hallazgo)\b",
+    re.IGNORECASE,
+)
+# "qué significa Perfect Orders" / "explícame Turbo Adoption"
+_EXPLAIN_METRIC_RE = re.compile(
+    r"\b(qué\s*(es|significa|mide)|explícame|cuéntame\s*sobre|cómo\s*se\s*calcula|"
+    r"cómo\s*interpreto|qué\s*quiere\s*decir)\s+"
+    r"(perfect\s*orders?|turbo\s*adoption|gross\s*profit|pro\s*adoption|"
+    r"markdowns?|assortment|atc\s*cvr|sst\s*cvr|mltv|breakeven|lead\s*penetration|"
+    r"non.?pro\s*ptc|non_pro_ptc|esta\s*métrica|las?\s*métricas?)\b",
+    re.IGNORECASE,
+)
+# "qué significa value" / "qué es n_zones" / "explícame la evidencia"
+_EXPLAIN_TABLE_RE = re.compile(
+    r"\b(qué\s*(es|son|significa|significan)|para\s*qué\s*sirve[ns]?|explícame|qué\s*quiere\s*decir)\s+"
+    r"(value|n_zones|n\s*zones|confidence|confidence_level|peer|peer_group|severity|"
+    r"severity_score|delta|la\s*evidencia|la\s*tabla|estas?\s*columnas?|"
+    r"estos?\s*números?)\b",
+    re.IGNORECASE,
+)
+
+# Terminal intents — no tool call, no state inheritance, clean plans
+_TERMINAL_INTENTS = {
+    "greeting", "help", "no_intent", "about_data",
+    "explain_result", "explain_metric", "explain_table", "no_intent_guided",
+}
+
+_CLEAN_PLAN_BASE = {
+    "metric": None,
+    "entity_scope": {"country": None, "city": None, "zone": None},
+    "time_window": "L0W",
+    "top_n": 5,
+}
+
+
+def _is_explain_metric(text: str) -> bool:
+    return bool(_EXPLAIN_METRIC_RE.search(text))
+
+
+def _is_explain_table(text: str) -> bool:
+    return bool(_EXPLAIN_TABLE_RE.search(text))
+
+
+def _is_greeting(text: str) -> bool:
+    return bool(_GREETING_RE.match(text) or _VAGUE_RE.match(text) or _GREETING_CONVERSATIONAL_RE.match(text))
+
+
+def _is_help(text: str) -> bool:
+    return bool(_HELP_RE.search(text))
+
+
+def _is_about_data(text: str) -> bool:
+    return bool(_ABOUT_DATA_RE.search(text))
+
+
+def _is_explain(text: str) -> bool:
+    return bool(_EXPLAIN_RE.search(text))
+
+
+def _is_too_short(text: str) -> bool:
+    return len(text.strip()) < 4
+
+
+# ── keyword maps ─────────────────────────────────────────────────────────────
 
 _RANK_KW = r"\b(top|ranking|rank|mejor|peor|mejores|peores|mayor|menor|más alto|más bajo|máximo|mínimo|cuál.*más|cuáles.*más)\b"
 _COMPARE_KW = r"\b(compar|versus|vs\.?|diferencia|contra|wealthy.*(non|no)\s*wealthy|(non|no)\s*wealthy.*wealthy|segmento|tipo de zona)\b"
@@ -18,7 +124,6 @@ _FOLLOWUP_SCOPE_KW = r"\b(solo en|solo para|ahora en|pero en|filtra|cambia.*a|en
 _FOLLOWUP_VIZ_KW = r"\b(muestr.*gráfico|muéstramelo|en gráfico|visualiz|chart|gráfica|tabla|ahora.*gráfico)\b"
 _QUERY_KW = r"\b(cuánto|cuál.*valor|dame el|promedio|mediana|agregado|aggregate|valor de)\b"
 
-# metric name → id map (partial match)
 _METRIC_ALIASES: dict[str, str] = {
     "perfect orders": "perfect_orders",
     "perfect order": "perfect_orders",
@@ -46,6 +151,23 @@ _COUNTRY_MAP: dict[str, str] = {
     "ecuador": "EC", "uruguay": "UY", "costa rica": "CR",
 }
 
+_VALID_INTENTS: set[str] = {
+    "rank", "compare", "trend", "insight_request", "hypothesis_request",
+    "follow_up_scope_refine", "follow_up_visualization", "query",
+    "greeting", "help", "no_intent", "about_data",
+    "explain_result", "explain_metric", "explain_table", "no_intent_guided",
+}
+
+
+# ── Phase 1: keyword router ───────────────────────────────────────────────────
+
+def _terminal_plan(intent: str, text: str, extra: dict | None = None) -> dict:
+    """Clean, context-free plan for non-analytical intents."""
+    plan = {"intent": intent, **_CLEAN_PLAN_BASE, "_raw_text": text, "_planner_source": "keyword"}
+    if extra:
+        plan.update(extra)
+    return plan
+
 
 def _extract_metric(text: str) -> str | None:
     t = text.lower()
@@ -60,7 +182,6 @@ def _extract_country(text: str) -> str | None:
     for name, code in _COUNTRY_MAP.items():
         if name in t:
             return code
-    # try 2-letter codes
     m = re.search(r"\b(AR|BR|CL|CO|CR|EC|MX|PE|UY)\b", text.upper())
     return m.group(1) if m else None
 
@@ -92,10 +213,48 @@ def _extract_top_n(text: str) -> int:
 
 
 def classify_intent(text: str, state=None) -> dict:
-    """Return plan dict with intent + extracted entities."""
+    """
+    Keyword-based classification. Always succeeds.
+    Terminal intents checked first — safe fallback default is no_intent_guided, NOT insight_request.
+    """
+    # ── terminal / UX intents ─────────────────────────────────────────────────
+    if _is_greeting(text) or _is_too_short(text):
+        return _terminal_plan("greeting", text)
+    if _is_help(text):
+        return _terminal_plan("help", text)
+    if _is_about_data(text):
+        return _terminal_plan("about_data", text)
+    if _is_explain_table(text):
+        plan = _terminal_plan("explain_table", text)
+        if state:
+            plan["_explain_context"] = {
+                "last_result_type": state.last_visualization,
+                "last_intent": state.last_intent,
+            }
+        return plan
+    if _is_explain_metric(text):
+        plan = _terminal_plan("explain_metric", text)
+        metric_id = _extract_metric(text)
+        plan["_metric_to_explain"] = metric_id or (state.last_metric_id if state else None)
+        return plan
+    if _is_explain(text):
+        plan = _terminal_plan("explain_result", text)
+        if state:
+            plan["_explain_context"] = {
+                "last_insight": state.last_top_insight,
+                "last_metric": state.last_metric_id,
+                "last_metric_display": state.last_metric_display,
+                "last_entity": dict(state.last_entity),
+                "last_intent": state.last_intent,
+                "last_compare_result": state.last_compare_result,
+                "last_trend_result": state.last_trend_result,
+                "last_result_type": state.last_result_type,
+            }
+        return plan
+
+    # ── analytical intent detection ───────────────────────────────────────────
     t_lower = text.lower()
 
-    # follow-up detection (scope or viz)
     if re.search(_FOLLOWUP_VIZ_KW, t_lower):
         intent = "follow_up_visualization"
     elif re.search(_FOLLOWUP_SCOPE_KW, t_lower) and state and state.last_intent:
@@ -113,7 +272,8 @@ def classify_intent(text: str, state=None) -> dict:
     elif re.search(_QUERY_KW, t_lower):
         intent = "query"
     else:
-        intent = "insight_request"  # safe default
+        # SAFE FALLBACK — vague text → guided non-analytical, not insight_request
+        intent = "no_intent_guided"
 
     metric = _extract_metric(text)
     country = _extract_country(text)
@@ -128,6 +288,7 @@ def classify_intent(text: str, state=None) -> dict:
         "time_window": time_window,
         "top_n": top_n,
         "_raw_text": text,
+        "_planner_source": "keyword",
     }
 
     if intent == "compare" and zone_type:
@@ -142,25 +303,142 @@ def classify_intent(text: str, state=None) -> dict:
     return plan
 
 
+# ── Phase 2: Gemini planner ───────────────────────────────────────────────────
+
+def _build_gemini_client():
+    if not LLM_ACTIVE:
+        return None
+    try:
+        from google import genai
+        return genai.Client(api_key=GEMINI_API_KEY)
+    except Exception as exc:
+        logger.warning("Gemini client init failed: %s", exc)
+        return None
+
+
+_gemini_client = None
+
+
+def _get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = _build_gemini_client()
+    return _gemini_client
+
+
+def _validate_llm_output(raw: dict, metric_ids: list[str]) -> tuple[bool, str]:
+    if not isinstance(raw, dict):
+        return False, "not a dict"
+    intent = raw.get("intent")
+    if intent not in _VALID_INTENTS:
+        return False, f"invalid intent '{intent}'"
+    metric = raw.get("metric")
+    if metric is not None and metric not in metric_ids:
+        return False, f"unknown metric '{metric}'"
+    country = (raw.get("entity_scope") or {}).get("country")
+    if country not in {"AR", "BR", "CL", "CO", "CR", "EC", "MX", "PE", "UY", None}:
+        return False, f"invalid country '{country}'"
+    tw = raw.get("time_window", "L0W")
+    if tw not in {"L0W", "L1W", "L2W", "L3W", "L4W", "L8W"}:
+        return False, f"invalid time_window '{tw}'"
+    return True, "ok"
+
+
+def _gemini_classify(text: str, artifacts: dict) -> tuple[dict | None, bool, str]:
+    """
+    Returns (plan_or_None, llm_attempted, error_reason). Never raises.
+    Uses concurrent.futures for timeout — thread-safe, works inside Streamlit.
+    (signal.SIGALRM not used — fails in non-main threads.)
+    """
+    if (_is_greeting(text) or _is_help(text) or _is_about_data(text)
+            or _is_explain(text) or _is_explain_metric(text) or _is_explain_table(text)
+            or _is_too_short(text)):
+        return None, False, "terminal_shortcircuit"
+
+    client = _get_gemini_client()
+    if client is None:
+        return None, False, "no_client"
+
+    from app.reto1.prompts import PLANNER_SYSTEM, PLANNER_USER
+    metric_ids = [m["id"] for m in artifacts["metrics_cfg"]["metrics"]]
+    full_prompt = (
+        PLANNER_SYSTEM.format(metric_ids=", ".join(metric_ids))
+        + "\n\n"
+        + PLANNER_USER.format(text=text)
+    )
+
+    try:
+        # thread-safe timeout — works in any thread including Streamlit workers
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                client.models.generate_content,
+                model=GEMINI_MODEL,
+                contents=full_prompt,
+            )
+            try:
+                response = future.result(timeout=LLM_TIMEOUT_SECONDS)
+            except concurrent.futures.TimeoutError:
+                return None, True, f"timeout:{LLM_TIMEOUT_SECONDS}s"
+
+        raw_text = response.text.strip()
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```[a-z]*\n?", "", raw_text)
+            raw_text = re.sub(r"\n?```$", "", raw_text)
+
+        parsed = json.loads(raw_text)
+        ok, reason = _validate_llm_output(parsed, metric_ids)
+        if not ok:
+            return None, True, f"invalid_output:{reason}"
+
+        comp = parsed.get("comparison") or {}
+        plan = {
+            "intent": parsed["intent"],
+            "metric": parsed.get("metric"),
+            "entity_scope": parsed.get("entity_scope") or {"country": None, "city": None, "zone": None},
+            "time_window": parsed.get("time_window", "L0W"),
+            "top_n": int(parsed.get("top_n") or 5),
+            "_raw_text": text,
+            "_planner_source": "gemini",
+            "_gemini_raw": parsed,
+        }
+
+        if parsed["intent"] == "compare":
+            plan["comparison"] = {
+                "segment_a": comp.get("segment_a") or "Wealthy",
+                "segment_b": comp.get("segment_b") or "Non Wealthy",
+                "dimension": "ZONE_TYPE",
+            }
+
+        if parsed.get("requires_clarification"):
+            plan["requires_clarification"] = True
+            plan["clarification_question"] = parsed.get("clarification_question")
+
+        return plan, True, "ok"
+
+    except (json.JSONDecodeError, KeyError, ValueError) as exc:
+        return None, True, f"parse_error:{exc}"
+    except Exception as exc:
+        return None, True, f"exception:{type(exc).__name__}:{exc}"
+
+
+# ── validation ────────────────────────────────────────────────────────────────
+
 def validate_plan(plan: dict, artifacts: dict) -> dict:
-    """8 semantic rules from NB40 validate_plan_v2."""
     metric = plan.get("metric")
     intent = plan.get("intent")
 
-    # Rule 1: unknown intent
-    supported = {"rank", "compare", "trend", "insight_request", "hypothesis_request",
-                 "follow_up_scope_refine", "follow_up_visualization", "query"}
-    if intent not in supported:
+    if intent in _TERMINAL_INTENTS:
+        return {"valid": True, "action": intent, "reason": "ok", "suggestion": "", "adjusted_plan": plan}
+
+    if intent not in _VALID_INTENTS:
         return {"valid": False, "action": "reject", "reason": f"Intent '{intent}' not supported",
                 "suggestion": "Reformula como ranking, comparación o insight.", "adjusted_plan": plan}
 
-    # Rule 2: suspended metric
     if metric in SUSPENDED_METRICS:
         return {"valid": False, "action": "reject",
                 "reason": "lead_penetration suspendida — definición pendiente con equipo de datos.",
                 "suggestion": "Prueba con perfect_orders o gross_profit_ue.", "adjusted_plan": plan}
 
-    # Rule 3: ZONE ambiguity (ZONE alone not unique — need COUNTRY)
     scope = plan.get("entity_scope", {})
     if scope.get("zone") and not scope.get("country"):
         plan = {**plan, "requires_clarification": True}
@@ -168,14 +446,11 @@ def validate_plan(plan: dict, artifacts: dict) -> dict:
                 "reason": "ZONE solo no es único — necesito COUNTRY + CITY.",
                 "suggestion": "¿En qué país/ciudad está esa zona?", "adjusted_plan": plan}
 
-    # Rule 4: hypothesis → non-causal mode
     if intent == "hypothesis_request":
         plan = {**plan, "_non_causal_mode": True, "_add_association_caveat": True}
 
-    # Rule 5: provisional direction caveat
     if metric:
-        metrics_list = artifacts.get("metrics_cfg", {}).get("metrics", [])
-        for m in metrics_list:
+        for m in artifacts.get("metrics_cfg", {}).get("metrics", []):
             if m["id"] == metric and m.get("direction_confidence") == "provisional":
                 plan = {**plan, "_add_provisional_caveat": True}
                 break
@@ -183,79 +458,66 @@ def validate_plan(plan: dict, artifacts: dict) -> dict:
     return {"valid": True, "action": "execute", "reason": "ok", "suggestion": "", "adjusted_plan": plan}
 
 
-# ── LLM planner (Phase 2, optional) ─────────────────────────────────────────
-
-def _llm_classify(text: str, artifacts: dict) -> dict | None:
-    """Try LLM structured output. Returns None on failure or if not configured."""
-    if not USE_LLM:
-        return None
-    try:
-        import anthropic
-        metric_ids = [m["id"] for m in artifacts["metrics_cfg"]["metrics"]]
-        client = anthropic.Anthropic()
-        prompt = f"""You are an intent classifier for an operational analytics chatbot.
-
-Available intents: rank, compare, trend, insight_request, hypothesis_request, follow_up_scope_refine, follow_up_visualization, query
-Available metrics: {', '.join(metric_ids)}
-Countries: AR, BR, CL, CO, CR, EC, MX, PE, UY
-
-User question: "{text}"
-
-Respond with a JSON object only:
-{{
-  "intent": "<intent>",
-  "metric": "<metric_id or null>",
-  "country": "<2-letter code or null>",
-  "time_window": "<L0W|L1W...|L8W>",
-  "top_n": <number or 5>,
-  "zone_type": "<Wealthy|Non Wealthy or null>"
-}}"""
-        resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=200,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        import json
-        return json.loads(resp.content[0].text)
-    except Exception:
-        return None
-
+# ── main entry ────────────────────────────────────────────────────────────────
 
 def build_plan(text: str, artifacts: dict, state=None) -> dict:
-    """Main entry: classify → validate → return plan."""
-    llm_result = _llm_classify(text, artifacts)
+    """
+    Planner chain:
+      1. Try Gemini (if LLM_ACTIVE, not terminal)
+      2. Keyword fallback (safe — defaults to no_intent_guided, not insight_request)
+    Debug keys: _planner_source, _llm_attempted, _llm_error, _planner_fallback.
+    """
+    llm_attempted = False
+    llm_error = ""
 
-    if llm_result:
-        plan = {
-            "intent": llm_result.get("intent", "insight_request"),
-            "metric": llm_result.get("metric"),
-            "entity_scope": {
-                "country": llm_result.get("country"),
-                "city": None,
-                "zone": None,
-            },
-            "time_window": llm_result.get("time_window", "L0W"),
-            "top_n": llm_result.get("top_n", 5),
-            "_raw_text": text,
-        }
-        zt = llm_result.get("zone_type")
-        if plan["intent"] == "compare":
-            plan["comparison"] = {
-                "segment_a": zt or "Wealthy",
-                "segment_b": "Non Wealthy" if (zt or "Wealthy") == "Wealthy" else "Wealthy",
-                "dimension": "ZONE_TYPE",
-            }
+    if LLM_ACTIVE:
+        plan, llm_attempted, llm_error = _gemini_classify(text, artifacts)
     else:
-        plan = classify_intent(text, state)
+        plan = None
 
-    if state:
+    used_fallback = plan is None
+    if plan is None:
+        plan = classify_intent(text, state)
+        if used_fallback and llm_attempted:
+            plan["_planner_source"] = "safe_fallback"
+
+    plan["_llm_attempted"] = llm_attempted
+    plan["_llm_error"] = llm_error if llm_error != "ok" else ""
+    if used_fallback and llm_attempted:
+        plan["_planner_fallback"] = True
+
+    # ensure explain intents have context (keyword path sets it; Gemini path may not)
+    if plan.get("intent") == "explain_result" and state and not plan.get("_explain_context"):
+        plan["_explain_context"] = {
+            "last_insight": state.last_top_insight,
+            "last_metric": state.last_metric_id,
+            "last_metric_display": state.last_metric_display,
+            "last_entity": dict(state.last_entity),
+            "last_intent": state.last_intent,
+            "last_compare_result": state.last_compare_result,
+            "last_trend_result": state.last_trend_result,
+            "last_result_type": state.last_result_type,
+        }
+    if plan.get("intent") == "explain_metric" and state and not plan.get("_metric_to_explain"):
+        plan["_metric_to_explain"] = state.last_metric_id
+    if plan.get("intent") == "explain_table" and state and not plan.get("_explain_context"):
+        plan["_explain_context"] = {
+            "last_result_type": state.last_visualization,
+            "last_intent": state.last_intent,
+        }
+
+    # follow-up context inheritance
+    if state and plan.get("intent") in ("follow_up_scope_refine", "follow_up_visualization"):
         from app.reto1.state import apply_follow_up
-        if plan["intent"] in ("follow_up_scope_refine", "follow_up_visualization"):
-            plan = apply_follow_up(state, plan)
+        plan = apply_follow_up(state, plan)
 
     validation = validate_plan(plan, artifacts)
     if not validation["valid"]:
-        return {**plan, "_validation": validation, "_error": validation["reason"],
-                "_suggestion": validation["suggestion"]}
+        return {
+            **plan,
+            "_validation": validation,
+            "_error": validation["reason"],
+            "_suggestion": validation["suggestion"],
+        }
 
     return {**validation["adjusted_plan"], "_validation": validation}
