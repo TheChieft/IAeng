@@ -23,6 +23,12 @@ question_types:
       - "¿Cuántos pedidos perfectos tuvo Lima Miraflores en L2W?"
     support_level: bien
 
+    unsupported_cases:
+      - Preguntas que requieren comparación entre múltiples entidades
+      - Tendencia temporal (usar intent trend)
+      - Entidades con has_missing_history=True en la semana solicitada → advertir
+    default_visualization: kpi_card
+    default_output_shape: entity=1, metric=1, week=1 → valor escalar + contexto peer
   - id: aggregate
     display_name: "Agregación"
     description: >
@@ -49,6 +55,12 @@ question_types:
       - "¿Cómo está el Pro Adoption en zonas Wealthy vs Non Wealthy?"
     support_level: bien
 
+    unsupported_cases:
+      - Grupos con < min_size_warning_threshold (5) zonas → excluir del resultado
+      - turbo_adoption (low_coverage_peer_groups=True) → excluir de peer benchmarks
+      - lead_penetration (suspended_pending_definition) → excluir siempre
+    default_visualization: bar_chart
+    default_output_shape: rows=group_dimension, cols=[stat, value, n_zones, coverage_pct]
   - id: rank
     display_name: "Ranking"
     description: >
@@ -75,6 +87,12 @@ question_types:
       - "¿Qué zonas tienen el Gross Profit UE más bajo en México?"
     support_level: bien
 
+    unsupported_cases:
+      - lead_penetration (outliers extremos invalidan el ranking)
+      - turbo_adoption en ranking peer (baja cobertura contamina orden)
+      - 'restaurants_markdowns_gmv: "top" = las que tienen MENOS descuentos — invertir dirección'
+    default_visualization: ranked_table
+    default_output_shape: rows=entity (top N / bottom N), cols=[rank, value, delta_vs_peer_median, n_peer]
   - id: trend
     display_name: "Tendencia temporal"
     description: >
@@ -99,6 +117,12 @@ question_types:
       - "¿Hay tendencia de mejora en Perfect Orders en Buenos Aires?"
     support_level: bien
 
+    unsupported_cases:
+      - Entidades con > 50% semanas nulas (excluir; reportar has_missing_history)
+      - Proyección futura (9 semanas insuficientes estadísticamente)
+      - Análisis de estacionalidad (historia demasiado corta)
+    default_visualization: line_chart
+    default_output_shape: rows=week_offset (L8W→L0W), cols=[value, wow_delta, wow_pct, missing_flag]
   - id: compare
     display_name: "Comparación entre segmentos"
     description: >
@@ -123,6 +147,12 @@ question_types:
       - "¿Hay diferencia en Perfect Orders entre zonas de alta prioridad y no priorizadas?"
     support_level: bien
 
+    unsupported_cases:
+      - Comparar segmentos de diferente naturaleza sin normalizar (metodológicamente engañoso)
+      - Segmentos con < min_size_warning_threshold zonas → marcar como low_confidence
+      - Comparar ONLY_ORDERS zones (sin métricas)
+    default_visualization: side_by_side_bar
+    default_output_shape: rows=segment, cols=[value, n_zones, delta_vs_other, confidence_level]
   - id: multivariable_filter
     display_name: "Filtro multivariable"
     description: >
@@ -147,6 +177,12 @@ question_types:
       - "Zonas con Pro Adoption > 0.30 y Gross Profit UE < 0"
     support_level: parcial  # thresholds no definidos aún
 
+    unsupported_cases:
+      - Métricas con desired_direction=unknown_pending_validation (puede invertir resultado)
+      - lead_penetration (escala inválida)
+      - Thresholds no proporcionados por el usuario (el sistema no los inventa)
+    default_visualization: filtered_table
+    default_output_shape: rows=entity (cumple todas las condiciones), cols=[zone_key, metric_values, n_conditions_met]
   - id: insight_request
     display_name: "Request de insight automático"
     description: >
@@ -170,6 +206,12 @@ question_types:
       - "Muéstrame zonas con deterioro persistente en cualquier métrica"
     support_level: parcial  # detectores sin calibrar aún
 
+    unsupported_cases:
+      - Métricas con validation_status=suspended_pending_definition (lead_penetration)
+      - turbo_adoption en detectores de benchmark peer
+      - Insights sin thresholds calibrados → marcar como provisional
+    default_visualization: alert_list
+    default_output_shape: rows=alert, cols=[detector_type, metric, value, severity, confidence_level, note]
   - id: hypothesis_request
     display_name: "Hipótesis explicativa"
     description: >
@@ -198,3 +240,9 @@ question_types:
       - "¿Qué métricas podrían explicar el crecimiento de órdenes en Lima?"
       - "¿Qué está detrás de la caída de órdenes en Buenos Aires esta semana?"
     support_level: parcial  # hipótesis sin validar, muestra corta
+    unsupported_cases:
+      - Afirmaciones causales (prohibido por language_rules)
+      - Correlaciones con n < min_history_for_trend_analysis semanas válidas
+      - Métricas sin correlación calculada en el dataset
+    default_visualization: correlation_table
+    default_output_shape: rows=candidate_metric, cols=[spearman_rho, n_weeks, framing_text]

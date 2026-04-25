@@ -10,8 +10,8 @@ El sistema responde preguntas de negocio, detecta anomalías y genera hipótesis
 |---|---|---|
 | `00_reto1_data_prep.ipynb` | ✓ Completo | — |
 | `10_reto1_eda.ipynb` | ✓ Completo | — |
-| `20_reto1_semantic_layer.ipynb` | ✓ Completo (iteración 1) | Direcciones pendientes validación negocio |
-| `30_reto1_insight_engine.ipynb` | Placeholder | NB 20 completo (OK) |
+| `20_reto1_semantic_layer.ipynb` | ✓ Completo (iteración 2, 29 celdas) | `desired_direction` pendiente validación negocio |
+| `30_reto1_insight_engine.ipynb` | Placeholder | NB 20 completo ✓, thresholds sin calibrar |
 | `40_reto1_chatbot_design.ipynb` | Placeholder | NB 30 completo |
 
 ## Flujo de notebooks
@@ -50,7 +50,7 @@ Carga el Excel fuente, limpia, detecta duplicados, transforma wide → long, con
 EDA orientado a diseño de sistema. Audita dimensiones categóricas, distribuciones por métrica, outliers, correlaciones Spearman WoW, cobertura temporal y mismatch de zonas.
 
 ### `20_reto1_semantic_layer.ipynb`
-Traduce hallazgos del EDA en artefactos gobernados: catálogo de métricas con capacidades analíticas, llave lógica de zona, peer groups evaluados, taxonomía de intents, reglas de lenguaje. Valida coherencia con 10 semantic checks.
+Traduce hallazgos del EDA en artefactos gobernados: catálogo de métricas con capacidades analíticas + estado de validación, llave lógica de zona, peer groups evaluados con reglas de fallback, taxonomía de intents con unsupported_cases, reglas de lenguaje, 13 semantic checks (PASS/WARN/FAIL). Exporta contrato completo a CSV/MD y checks a JSON/MD.
 
 ### `30_reto1_insight_engine.ipynb` _(placeholder)_
 Implementará 4 detectores transparentes usando las reglas de `config/business_rules.yaml`. Output: alertas clasificadas por tipo y confianza.
@@ -68,7 +68,11 @@ Implementará el flujo completo: intent → función semántica → narrativa au
 | `data/processed/orders_long.parquet` | NB 00 | Órdenes long, mismo grano |
 | `data/processed/zone_master.parquet` | NB 00 | Cobertura cruzada de zonas |
 | `reports/reto1/pipeline_validation.json` | NB 00 | 10 checks estructurales |
-| `reports/reto1/semantic_layer_report.json` | NB 20 | 10 semantic checks + resumen catálogo |
+| `reports/reto1/semantic_layer_report.json` | NB 20 | Resumen catálogo + peer groups + intents |
+| `reports/reto1/semantic_contract_summary.csv` | NB 20 | Contrato completo: 13 métricas × 17 campos |
+| `reports/reto1/semantic_contract_summary.md` | NB 20 | Versión markdown del contrato |
+| `reports/reto1/semantic_checks.json` | NB 20 | 13 checks PASS/WARN/FAIL con implicación |
+| `reports/reto1/semantic_checks.md` | NB 20 | Versión markdown de los checks |
 
 ## Decisiones de diseño clave
 

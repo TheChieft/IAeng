@@ -69,6 +69,28 @@ peer_groups:
         Excluir de benchmarks peer hasta clarificar la definición del denominador.
         Los outliers extremos (>1.0) invalidan comparaciones directas.
 
+  # Comportamiento de fallback cuando el peer group es inválido o insuficiente
+  fallback_behavior:
+    when_group_too_small: >
+      Si n_zonas < min_size_warning_threshold (5): excluir completamente del benchmark.
+      Respuesta del sistema: "Peer group insuficiente para esta zona (n=X). No se generó benchmark."
+    when_group_low_confidence: >
+      Si min_size_warning_threshold ≤ n_zonas < min_size_for_benchmark (10): incluir resultado
+      marcado como low_confidence. Respuesta: incluir nota "Benchmark basado en grupo pequeño
+      (n=X). Interpretar con cautela."
+    when_no_matching_group: >
+      Si la zona no tiene atributos ZONE_TYPE o ZONE_PRIORITIZATION: no generar benchmark.
+      Reportar ausencia explícitamente: "No se encontró peer group válido para esta zona."
+
+  # Combinaciones que NO deben compararse directamente
+  not_comparable:
+    - "Zonas Wealthy vs Non Wealthy sin controlar por COUNTRY (perfiles distintos + mercados distintos)"
+    - "Zonas High Priority vs Not Prioritized sin controlar por ZONE_TYPE"
+    - "Zonas de países distintos sin nivel COUNTRY en las dimensiones del peer group"
+    - "ONLY_ORDERS zones contra BOTH zones (las primeras no tienen métricas)"
+    - "Zonas con has_missing_history > 50% en análisis de tendencia (historia insuficiente)"
+    - "Canal Restaurants vs canal Retail en métricas de CVR (denominadores distintos)"
+
 # ===========================================================================
 # REGLAS TEMPORALES
 # ===========================================================================

@@ -38,8 +38,17 @@ metrics:
       lo cual es deseable operacionalmente.
     outlier_risk: low
     low_coverage_peer_groups: false
-    notes: null
+    notes:
 
+    validation_status: pending_business_validation
+    validation_reason: >
+      Dirección operacionalmente lógica (mayor conversión PTC→OP = mejor).
+
+      Sin validación formal de negocio.
+    risk_if_wrong: >
+      Bajo en dirección: la lógica de conversión es robusta.
+
+      Riesgo mayor en thresholds de alerta, no en la dirección misma.
   - id: pct_restaurants_sessions_optimal_assortment
     display_name: "% Restaurants Sessions With Optimal Assortment"
     description: >
@@ -59,6 +68,15 @@ metrics:
       Distribución bimodal observada en EDA (concentración en extremos 0 y 1).
       Verificar si la definición de "óptimo" es consistente entre zonas.
 
+    validation_status: pending_business_validation
+    validation_reason: >
+      La definición de "óptimo" no está confirmada como consistente
+
+      entre zonas y países. Distribución bimodal sugiere definición heterogénea.
+    risk_if_wrong: >
+      Medio: si "óptimo" mide algo diferente por mercado, los benchmarks
+
+      cross-country serían inválidos aunque la dirección sea correcta.
   - id: pro_adoption_last_week
     display_name: "Pro Adoption (Last Week Status)"
     description: >
@@ -74,8 +92,17 @@ metrics:
       lo que está alineado con el modelo de monetización.
     outlier_risk: low
     low_coverage_peer_groups: false
-    notes: null
+    notes:
 
+    validation_status: pending_business_validation
+    validation_reason: >
+      Alineado con modelo de monetización. Alta confianza conceptual.
+
+      Riesgo mayor en definición snapshot semanal vs cumulativo por zona.
+    risk_if_wrong: >
+      Bajo en dirección.
+
+      Medio en comparabilidad si el snapshot semanal se calcula diferente por zona.
   - id: restaurants_ss_atc_cvr
     display_name: "Restaurants SS > ATC CVR"
     description: >
@@ -94,6 +121,15 @@ metrics:
       Correlación Spearman 0.229 con WoW de órdenes — la asociación más alta del dataset.
       Candidata prioritaria para hipótesis de driver de crecimiento. No causalidad.
 
+    validation_status: pending_business_validation
+    validation_reason: >
+      Correlación Spearman 0.229 con WoW órdenes refuerza la hipótesis higher_is_better.
+
+      Es la correlación más alta del dataset. Sin confirmación causal.
+    risk_if_wrong: >
+      Bajo en dirección.
+
+      Si alta CVR refleja sesiones cortas o impulsivas podría no ser sostenible a largo plazo.
   - id: restaurants_sst_ss_cvr
     display_name: "Restaurants SST > SS CVR"
     description: >
@@ -113,6 +149,15 @@ metrics:
       Rango observado: 0.116–1.000. El mínimo de 0.116 puede indicar outliers bajos
       o zonas con problemas de relevancia de búsqueda.
 
+    validation_status: pending_business_validation
+    validation_reason: >
+      Mayor conversión búsqueda→sesión indica relevancia de oferta. Sin validación formal.
+
+      Rango observado 0.116–1.000 sugiere heterogeneidad real entre zonas.
+    risk_if_wrong: >
+      Bajo en dirección.
+
+      Riesgo mayor: no usar como benchmark cross-canal con retail (denominadores distintos).
   - id: gross_profit_ue
     display_name: "Gross Profit UE"
     description: >
@@ -134,6 +179,15 @@ metrics:
       de alerta deben ser significativamente más amplios que para métricas ratio.
       No usar STD para reglas de anomalía — usar IQR o MAD.
 
+    validation_status: pending_business_validation
+    validation_reason: >
+      Dirección financieramente obvia (mayor rentabilidad = mejor).
+
+      ALTA PRECAUCIÓN por outliers extremos: rango -229 a +12.8, STD mediana 0.608.
+    risk_if_wrong: >
+      ALTO en thresholds: si se usan STD o IQR estándar, alertas serían masivamente incorrectas.
+
+      Usar MAD exclusivamente para esta métrica. Dirección en sí es de bajo riesgo.
   - id: retail_sst_ss_cvr
     display_name: "Retail SST > SS CVR"
     description: >
@@ -151,6 +205,15 @@ metrics:
       Analizar junto a Restaurants SST > SS CVR para comparación entre canales.
       No asumir que el nivel de referencia (benchmark) es el mismo para ambos canales.
 
+    validation_status: pending_business_validation
+    validation_reason: >
+      Misma lógica que restaurants_sst_ss_cvr pero canal Retail.
+
+      El nivel de referencia (benchmark) es distinto por canal — no asumir igualdad.
+    risk_if_wrong: >
+      Medio: comparar Retail vs Restaurants como peer group sería metodológicamente incorrecto.
+
+      Los canales deben benchmarkearse por separado.
   - id: pct_pro_users_breakeven
     display_name: "% PRO Users Who Breakeven"
     description: >
@@ -170,6 +233,15 @@ metrics:
       Rango 0–1 con mediana 0.313. Distribución no observada en detalle —
       verificar si hay bimodalidad por tipo de zona.
 
+    validation_status: pending_business_validation
+    validation_reason: >
+      Mayor % breakeven indica mejor retención potencial y menor churn Pro.
+
+      La fórmula de breakeven puede variar por país o modelo de precios local.
+    risk_if_wrong: >
+      Medio: si la fórmula de breakeven difiere por país,
+
+      las comparaciones cross-country serían inválidas aunque la dirección sea correcta.
   - id: lead_penetration
     display_name: "Lead Penetration"
     description: >
@@ -192,6 +264,17 @@ metrics:
       o definición diferente de "lead" entre mercados.
       NO usar esta métrica en benchmarks hasta clarificar el denominador.
 
+    validation_status: suspended_pending_definition
+    validation_reason: >
+      Outlier extremo (max=393.9) invalida la escala ratio declarada.
+
+      El denominador no está clarificado. Causas posibles: error de dato,
+
+      denominador distinto, o definición diferente de "lead" entre mercados.
+    risk_if_wrong: >
+      CRÍTICO: cualquier alerta, ranking o benchmark con esta métrica en estado actual
+
+      es potencialmente inválido. No usar hasta clarificar denominador y escala.
   - id: perfect_orders
     display_name: "Perfect Orders"
     description: >
@@ -210,6 +293,17 @@ metrics:
       Rango 0.137–1.000. El valor mínimo de 0.137 sugiere que algunas zonas
       tienen problemas operacionales severos. Métrica directamente accionable.
 
+    validation_status: pending_business_validation
+    validation_reason: >
+      Dirección clara y directamente accionable. Alta confianza conceptual.
+
+      Métrica de calidad operacional con impacto directo en NPS y retención.
+    risk_if_wrong: >
+      Bajo en dirección.
+
+      Medio: la definición de "perfecto" (a tiempo + completo + sin incidencias)
+
+      puede variar entre mercados si los SLAs son distintos.
   - id: mltv_top_verticals_adoption
     display_name: "MLTV Top Verticals Adoption"
     description: >
@@ -230,6 +324,15 @@ metrics:
       Cobertura incompleta en CR (Costa Rica) y algunas zonas BR.
       Verificar si MLTV está definido consistentemente por país.
 
+    validation_status: pending_business_validation
+    validation_reason: >
+      Mayor adopción de verticales alto-LTV es estratégicamente deseable.
+
+      Cobertura incompleta en CR y algunas zonas BR. MLTV puede no ser consistente por país.
+    risk_if_wrong: >
+      Medio: si MLTV no está definido consistentemente por país,
+
+      los benchmarks cross-country serían inválidos.
   - id: restaurants_markdowns_gmv
     display_name: "Restaurants Markdowns / GMV"
     description: >
@@ -251,6 +354,17 @@ metrics:
       Los sistemas de alerta y ranking deben manejar esta inversión explícitamente.
       Rango observado: 0.02–0.43.
 
+    validation_status: pending_business_validation
+    validation_reason: >
+      ÚNICA lower_is_better del catálogo. Menos descuentos sobre GMV = mayor eficiencia.
+
+      Alta confianza conceptual. ATENCIÓN: todos los sistemas deben manejar esta inversión explícitamente.
+    risk_if_wrong: >
+      ALTO: si la dirección se invierte por error de implementación,
+
+      todos los rankings y alertas de esta métrica quedan invertidos.
+
+      Verificar explícitamente en cada detector y función de ranking.
   - id: turbo_adoption
     display_name: "Turbo Adoption"
     description: >
@@ -271,3 +385,14 @@ metrics:
       No incluir en benchmarks peer hasta tener cobertura mínima (≥70% del grupo).
       Los valores faltantes probablemente indican zonas sin disponibilidad de Turbo,
       no zonas con 0% de adopción — la diferencia importa para el análisis.
+    validation_status: pending_business_validation
+    validation_reason: >
+      Mayor adopción Turbo es deseable pero cobertura baja (<70% en algunos peer groups).
+
+      Los faltantes probablemente indican no-disponibilidad, no adopción cero.
+    risk_if_wrong: >
+      Alto en benchmarking: comparar zonas sin disponibilidad Turbo
+
+      contra zonas con Turbo disponible genera benchmarks inválidos.
+
+      Excluir de peer benchmarks hasta cobertura ≥70% en el grupo.

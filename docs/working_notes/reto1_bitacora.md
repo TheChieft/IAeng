@@ -172,3 +172,61 @@ No se incorpora contenido en esta iteración.
 
 NB 30 puede ahora leer reglas de `config/business_rules.yaml` para los 4 detectores:
 `wow_delta`, `decline_streak`, `vs_peer_median`, `robust_z` — con thresholds provisionales.
+
+---
+
+## Iteración 6 — 2026-04-25: Fortalecimiento del contrato semántico (NB 20 v2)
+
+### Cambios en NB 20
+
+NB 20 pasó de 22 a 29 celdas. No fue rehecho — se agregaron 7 celdas nuevas y se reforzó 1.
+
+| Sección nueva | Qué hace |
+|---|---|
+| `nb20-s2b` — Contrato semántico completo | Tabla unificada: capabilities + validation_status + outlier_risk por métrica. Export CSV + MD |
+| `nb20-s5b` — Peer group operativo | Ejemplo real: zona → peer group → tamaño → confianza. Reglas de fallback. Lista "no comparable" |
+| `nb20-s6b` — Intents operativos | Tabla de intents con unsupported_cases, default_visualization, output_shape |
+| `nb20-s9-checks` (reemplazado) | 13 checks con nivel PASS/WARN/FAIL + implicación. Export semantic_checks.json + .md |
+| `nb20-s9b` — Decisiones abiertas | Tabla: cerradas vs abiertas. Riesgos para NB 30. Mitigación propuesta |
+
+### Cambios en archivos de configuración
+
+**`config/metrics.yaml`** — 3 campos nuevos por métrica:
+- `validation_status`: `pending_business_validation` (12 métricas) o `suspended_pending_definition` (lead_penetration)
+- `validation_reason`: por qué la dirección es provisional y cuál es el riesgo específico
+- `risk_if_wrong`: consecuencia concreta si la dirección declarada es incorrecta
+
+**`config/question_types.yaml`** — 3 campos nuevos por intent:
+- `unsupported_cases`: lista explícita de qué no puede manejar cada intent
+- `default_visualization`: tipo de visualización por defecto
+- `default_output_shape`: estructura esperada del output
+
+**`config/business_rules.yaml`** — 2 secciones nuevas en `peer_groups`:
+- `fallback_behavior`: qué hacer cuando grupo too_small, low_confidence, o no hay grupo
+- `not_comparable`: lista explícita de comparaciones inválidas
+
+### Nuevos artefactos generados por NB 20
+
+| Artefacto | Descripción |
+|---|---|
+| `reports/reto1/semantic_contract_summary.csv` | Tabla completa: 13 métricas × 17 campos |
+| `reports/reto1/semantic_contract_summary.md` | Versión markdown legible para revisión humana |
+| `reports/reto1/semantic_checks.json` | 13 checks con status PASS/WARN/FAIL + implicación |
+| `reports/reto1/semantic_checks.md` | Versión markdown de los checks |
+
+### Decisiones semánticas cerradas (usables en NB 30)
+
+- ZONE_KEY = COUNTRY|CITY|ZONE (probado empíricamente)
+- Peer group primario: (COUNTRY, ZONE_TYPE, ZONE_PRIORITIZATION)
+- `lead_penetration` excluida de rankings y benchmarks
+- `turbo_adoption` excluida de peer benchmarks
+- `restaurants_markdowns_gmv` es lower_is_better — ranking debe invertir dirección
+
+### Decisiones aún abiertas (antes de usar NB 30 en producción)
+
+- Validar `desired_direction` de las 13 métricas con área de negocio (todas son `provisional`)
+- Calibrar `alert_threshold_pct` del detector wow_delta (actualmente 10%)
+- Calibrar `min_weeks_for_alert` del decline_streak (actualmente 3)
+- Calibrar `anomaly_threshold` del robust_z (actualmente 2.5)
+- Clarificar denominador de `lead_penetration`
+- Definir si `turbo_adoption` NaN = no-disponible o adopción cero
