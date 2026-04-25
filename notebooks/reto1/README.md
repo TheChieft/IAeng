@@ -12,7 +12,7 @@ El sistema responde preguntas de negocio, detecta anomalías y genera hipótesis
 | `10_reto1_eda.ipynb`            | ✓ Completo                          | —                                                |
 | `20_reto1_semantic_layer.ipynb` | ✓ Completo (iteración 2, 29 celdas) | `desired_direction` pendiente validación negocio |
 | `30_reto1_insight_engine.ipynb` | ✓ Completo (iteración 1 funcional)  | thresholds y direcciones aún provisionales       |
-| `40_reto1_chatbot_design.ipynb` | Placeholder                         | Integrar consumo de `insight_candidates.*`       |
+| `40_reto1_chatbot_design.ipynb` | ✓ Completo (diseño conversacional)  | Implementación app y runtime de tools            |
 
 ## Flujo de notebooks
 
@@ -38,9 +38,12 @@ El sistema responde preguntas de negocio, detecta anomalías y genera hipótesis
     → reports/reto1/insight_engine_report.{json,md}
     → reports/reto1/insight_samples.md
 
-40_reto1_chatbot_design  [pendiente]
-    → intent classifier → semantic function → narrative renderer
-    → bot demo interactivo
+40_reto1_chatbot_design
+    → planner schema + intent router + clarification policy
+    → tool contract + response contract + language guardrails
+    → docs/architecture/reto1_chatbot_contract.md
+    → reports/reto1/chatbot_design_summary.md
+    → reports/reto1/golden_conversation_flows.md
 ```
 
 ## Qué hace cada notebook
@@ -57,8 +60,8 @@ Traduce hallazgos del EDA en artefactos gobernados: catálogo de métricas con c
 ### `30_reto1_insight_engine.ipynb`
 Implementa el backend analítico gobernado del sistema de insights. Incluye 5 detectores trazables (anomalía puntual, deterioro persistente, brecha peer, oportunidad y posibles drivers asociados), scoring común con penalizaciones de gobernanza, narrativa templada y validación de edge cases semánticos.
 
-### `40_reto1_chatbot_design.ipynb` _(placeholder)_
-Implementará el flujo completo: intent → función semántica → narrativa auditada. Usará los intents de `config/question_types.yaml` y las reglas de lenguaje de `config/business_rules.yaml`.
+### `40_reto1_chatbot_design.ipynb`
+Define la capa conversacional/orquestadora sobre NB20+NB30: arquitectura de planner, contrato de herramientas, reglas de clarificación, estado conversacional mínimo, contrato de respuesta, guardrails de lenguaje y 10 golden conversation flows para pruebas.
 
 ## Artefactos generados
 
@@ -80,6 +83,10 @@ Implementará el flujo completo: intent → función semántica → narrativa au
 | `reports/reto1/insight_engine_report.json`    | NB 30        | Resumen técnico del motor (scoring, penalizaciones, límites) |
 | `reports/reto1/insight_engine_report.md`      | NB 30        | Reporte legible de resultados y top candidatos               |
 | `reports/reto1/insight_samples.md`            | NB 30        | Ejemplos de narrativa templada por categoría                 |
+| `docs/architecture/reto1_chatbot_contract.md` | NB 40        | Contrato conversacional y de orquestación del chatbot        |
+| `reports/reto1/chatbot_design_summary.md`     | NB 40        | Resumen de decisiones de diseño conversacional               |
+| `reports/reto1/golden_conversation_flows.md`  | NB 40        | Flujos golden para evaluación end-to-end del chatbot         |
+| `reports/reto1/chatbot_planner_schema.json`   | NB 40        | Schema estructurado del planner de ejecución                 |
 
 ## Decisiones de diseño clave
 
@@ -95,7 +102,7 @@ Implementará el flujo completo: intent → función semántica → narrativa au
 1. Calibrar thresholds en `config/business_rules.yaml` por métrica.
 2. Validar `desired_direction` de las 13 métricas con el área de negocio.
 3. Calibrar thresholds por métrica de NB 30 con validación de negocio.
-4. Implementar NB 40 (chatbot) consumiendo `insight_candidates.*` y reglas de lenguaje.
+4. Implementar app conversacional (runtime) consumiendo contratos definidos en NB40.
 
 ## Referencias
 

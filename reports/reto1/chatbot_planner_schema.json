@@ -1,0 +1,111 @@
+{
+  "title": "ChatbotExecutionPlan",
+  "type": "object",
+  "required": [
+    "intent",
+    "requested_output",
+    "requires_clarification",
+    "confidence_mode"
+  ],
+  "properties": {
+    "intent": {
+      "type": "string",
+      "description": "Intent canonico de question_types"
+    },
+    "metric": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "entity_scope": {
+      "type": "object",
+      "properties": {
+        "country": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "city": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "segment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "filters": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "comparison": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "time_window": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "ej: L0W, L8W-L0W"
+    },
+    "requested_output": {
+      "type": "string",
+      "enum": [
+        "kpi",
+        "table",
+        "chart",
+        "narrative",
+        "insights"
+      ]
+    },
+    "chart_preference": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "confidence_mode": {
+      "type": "string",
+      "enum": [
+        "strict",
+        "balanced",
+        "exploratory"
+      ]
+    },
+    "requires_clarification": {
+      "type": "boolean"
+    },
+    "clarification_question": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tool_calls": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "additionalProperties": false
+}

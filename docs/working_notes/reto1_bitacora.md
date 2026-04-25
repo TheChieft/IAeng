@@ -303,3 +303,156 @@ Secciones implementadas:
 - Un contrato de salida único (`insight_candidates.*`) para que el chatbot consuma hallazgos.
 - Narrativas base controladas por plantilla y caveats semánticos.
 - Priorización cuantitativa reproducible para ordenar respuestas del bot.
+
+---
+
+## Iteración 8 — 2026-04-25: Diseño conversacional del chatbot (NB 40)
+
+### Cambios principales en `notebooks/reto1/40_reto1_chatbot_design.ipynb`
+
+Se implementó el diseño completo de la capa conversacional/orquestadora, sin duplicar cálculo analítico de NB20/NB30.
+
+Secciones diseñadas:
+1. Setup y contexto de la capa conversacional.
+2. Arquitectura propuesta (qué hace y qué no hace el chatbot).
+3. Catálogo operativo de intents mapeado a comportamiento conversacional.
+4. Planner estructurado con schema explícito de ejecución.
+5. Reglas de clarificación para evitar supuestos peligrosos.
+6. Gestión de contexto conversacional mínima (state object).
+7. Contrato de herramientas determinísticas (inputs/outputs/errores/caveats).
+8. Contrato de respuesta del chatbot (estructura fija de salida).
+9. Reglas de lenguaje y seguridad analítica (no causalidad, incertidumbre, peer weak).
+10. UX conversacional propuesta (componentes y wireframe lógico).
+11. Golden conversation flows (10 flujos).
+12. Framework de evaluación conversacional.
+13. Plan de implementación a app.
+14. Exportes de documentación técnica.
+
+### Arquitectura conversacional definida
+
+- El chatbot funciona como **planner + orchestrator + renderer**.
+- El cálculo permanece en funciones determinísticas y en outputs de NB30.
+- El planner convierte lenguaje natural a plan estructurado (intent, params, alcance, modo de confianza, clarificación).
+- La respuesta final siempre incluye evidencia, alcance, caveat y siguientes preguntas.
+
+### Herramientas previstas para consumo del chatbot
+
+- `get_metric_value`
+- `aggregate_metric`
+- `rank_by_metric`
+- `get_trend`
+- `compare_segments`
+- `screen_by_conditions`
+- `run_insight_detectors`
+- `get_insight_candidates`
+- `generate_hypothesis_candidates`
+- `render_chart_data`
+
+### Reglas críticas fijadas en diseño
+
+1. El chatbot no calcula por sí mismo métricas analíticas.
+2. En modo hipótesis, el lenguaje es explícitamente no causal.
+3. Métricas pending/provisional deben reflejar caveat en respuesta.
+4. Peer groups débiles deben reflejar caveat de confianza.
+5. Comparaciones inválidas según NB20 deben rechazarse o reformularse.
+6. Preguntas fuera de alcance no se improvisan.
+
+### Golden flows definidos
+
+Se diseñaron 10 flujos conversacionales incluyendo:
+- ranking con métrica suspendida (debe rechazar y proponer alternativa),
+- comparación por segmento válida,
+- tendencia con posible ambigüedad de entidad,
+- request de insight,
+- hypothesis request con guardrail de no causalidad,
+- follow-ups de filtro y visualización.
+
+### Artefactos nuevos generados
+
+- `docs/architecture/reto1_chatbot_contract.md`
+- `reports/reto1/chatbot_design_summary.md`
+- `reports/reto1/golden_conversation_flows.md`
+- `reports/reto1/chatbot_planner_schema.json`
+
+### Qué queda pendiente para implementación real
+
+1. Implementar runtime de tools en app (ej. Streamlit/API) con validación de schemas.
+2. Integrar state manager conversacional persistente y seguro.
+3. Ejecutar evaluación sobre golden flows con métricas de accuracy/groundedness.
+4. Endurecer políticas de fallback y manejo de errores en tiempo real.
+
+---
+
+## Iteración 7 — 2026-04-25: Diseño conversacional NB 40 (v2)
+
+### Qué arquitectura conversacional se definió
+
+**Principio rector:** el LLM no calcula — orquesta.
+
+```
+User input → LLM Planner → validate_plan() → tool calls → LLM Renderer (language guards) → respuesta
+```
+
+- **LLM Planner**: clasifica intent, extrae parámetros, construye `ChatbotExecutionPlan`
+- **validate_plan()**: pre-flight semántico contra metrics.yaml + business_rules.yaml (nueva función en NB40)
+- **Tool layer**: funciones determinísticas — `get_metric_value`, `rank_by_metric`, `get_trend`, etc.
+- **NB30 routing**: `insight_request` no re-ejecuta detectores — lee `insight_candidates.parquet`
+- **LLM Renderer**: aplica `response_contract` + 3 language guard functions:
+  - `apply_direction_guard()`: neutral vs directional language según validation_status
+  - `apply_hypothesis_guard()`: rechaza forbidden_terms causales
+  - `build_uncertainty_caveat()`: caveat por validation_status + peer_n
+
+### Herramientas que usará el chatbot
+
+| Tool | Intent | NB30 o semántica |
+|---|---|---|
+| `get_metric_value` | query | semántica |
+| `aggregate_metric` | aggregate | semántica |
+| `rank_by_metric` | rank | semántica |
+| `get_trend` | trend | semántica |
+| `compare_segments` | compare | semántica |
+| `screen_by_conditions` | multivariable_filter | semántica |
+| `route_insight_request` | insight_request | NB30 (parquet) |
+| `generate_hypothesis_candidates` | hypothesis_request | NB30 (correlaciones) |
+| `render_chart_data` | follow_up_visualization | renderer |
+
+### Reglas de clarificación fijadas
+
+- ZONE sin COUNTRY y CITY → clarify (ZONE no es único)
+- Métrica suspendida (`lead_penetration`) → clarify con alternativa
+- Comparación inválida (cross-canal, cross-country sin controlar) → rechazar + proponer
+- Pregunta causal fuerte ("causa", "explica") → rechazar + ofrecer hipótesis asociativa
+- Peer group < 5 zonas → excluir y reportar; < 10 → low_confidence warning
+
+### Golden flows definidos (10 flujos)
+
+| ID | Tipo | Trigger |
+|---|---|---|
+| GF01 | Métrica suspendida | "Top 5 Lead Penetration" |
+| GF02 | Comparación válida | "Wealthy vs Non Wealthy en México" |
+| GF03 | Zona ambigua | "Evolución Gross Profit UE en Chapinero" |
+| GF06 | Hipótesis no-causal | "¿Qué explica el crecimiento de órdenes?" |
+| GF07 | Follow-up scope | "¿Y solo en Colombia?" |
+| GF08 | Follow-up viz | "Muéstralo en gráfico" |
+| GF09 | Insight request (NB30) | "¿Qué problemas tiene Bogotá esta semana?" |
+| GF10 | Causalidad rechazada | "Demuéstrame que CVR causa orders" |
+
+### Cambios en NB40 (28 → 33 celdas)
+
+| Celda nueva | Qué agrega |
+|---|---|
+| `nb40-arch-diagram` | Diagrama ASCII del flujo completo (User → LLM → Tools → LLM → Response) |
+| `nb40-planner-validate` | `validate_plan()`: 6 reglas semánticas, demo con 4 casos |
+| `nb40-nb30-routing` | `route_insight_request()`: lookup en parquet, demo con filtro por país |
+| `nb40-lang-guards` | 3 guard functions: direction, hypothesis, uncertainty_caveat |
+| `nb40-golden-rich` | 8 diálogos completos (USER/PLAN/TOOL/BOT/CAVEAT/NEXT_Q) |
+| Export reemplazado | Genera docs profundas: 4 archivos con contenido real (no solo tablas) |
+
+### Qué falta para pasar de diseño a implementación real
+
+1. **Planner como prompt LLM**: convertir `planner_schema` en system prompt con structured output
+2. **Tool adapter layer**: implementar las 9 funciones del tool_contract con datos reales
+3. **State manager**: clase `ChatSessionState` con serialización y expiración de contexto
+4. **Golden flow tests**: pipeline de evaluación automática (intent accuracy, groundedness)
+5. **App shell**: Streamlit o equivalente consumiendo contratos definidos en NB40
+6. **Calibración de thresholds**: antes de activar `insight_request` en producción
