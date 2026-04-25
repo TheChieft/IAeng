@@ -1,0 +1,186 @@
+# config/business_rules.yaml
+# Reglas de negocio y gobernanza analítica — Reto 1: Operational Intelligence
+#
+# ESTADO: iteración inicial. Todos los thresholds son PROVISIONALES.
+# Requieren calibración con datos históricos y validación de negocio.
+
+# ===========================================================================
+# ENTIDADES Y LLAVES LÓGICAS
+# ===========================================================================
+entities:
+  zone:
+    logical_key: [COUNTRY, CITY, ZONE]
+    display_fields: [COUNTRY, CITY, ZONE]
+    why_composite_key: >
+      ZONE sola no es identificador único. El mismo nombre de zona puede existir en
+      múltiples ciudades o países. Los joins, peer groups y rankings deben usar
+      siempre la combinación COUNTRY + CITY + ZONE.
+    notes: >
+      COUNTRY es el único campo con uppercase obligatorio. CITY y ZONE preservan
+      su casing original del dato fuente para display.
+
+  country:
+    logical_key: [COUNTRY]
+    notes: Normalizado a uppercase en el pipeline.
+
+  city:
+    logical_key: [COUNTRY, CITY]
+    notes: >
+      CITY puede tener el mismo nombre en distintos países.
+      Siempre incluir COUNTRY al agrupar por ciudad.
+
+# ===========================================================================
+# PEER GROUPS
+# ===========================================================================
+peer_groups:
+  # Definición primaria: comparable por mercado + perfil socioeconómico + prioridad
+  primary:
+    dimensions: [COUNTRY, ZONE_TYPE, ZONE_PRIORITIZATION]
+    rationale: >
+      Combina tres dimensiones de comparabilidad natural:
+      - COUNTRY: el mercado (Brasil vs. México son mercados distintos)
+      - ZONE_TYPE: perfil socioeconómico de la zona (Wealthy vs. Non Wealthy)
+      - ZONE_PRIORITIZATION: nivel de prioridad operativa (High Priority / Prioritized / Not Prioritized)
+      Comparar una zona Wealthy de alta prioridad en Brasil contra una Non Wealthy
+      no priorizada en Uruguay sería metodológicamente incorrecto.
+
+  # Definición secundaria: más granular, útil para comparaciones intra-ciudad
+  secondary:
+    dimensions: [COUNTRY, CITY]
+    rationale: Útil cuando la ciudad es el nivel de análisis, no el peer group.
+
+  # Reglas de tamaño
+  size_rules:
+    min_size_for_benchmark: 10
+    min_size_warning_threshold: 5
+    rationale: >
+      Grupos con <10 zonas son estadísticamente frágiles. La mediana del grupo puede
+      estar dominada por outliers individuales. Cualquier alerta basada en estos
+      grupos debe marcarse como low_confidence.
+
+  # Métricas con restricciones adicionales de peer group
+  restricted_metrics:
+    - metric_id: turbo_adoption
+      restriction: >
+        Excluir de benchmarks peer hasta que la cobertura dentro del grupo sea ≥70%.
+        Los faltantes probablemente indican no-disponibilidad, no adopción cero.
+    - metric_id: lead_penetration
+      restriction: >
+        Excluir de benchmarks peer hasta clarificar la definición del denominador.
+        Los outliers extremos (>1.0) invalidan comparaciones directas.
+
+# ===========================================================================
+# REGLAS TEMPORALES
+# ===========================================================================
+temporal:
+  available_offsets: [L8W, L7W, L6W, L5W, L4W, L3W, L2W, L1W, L0W]
+  current_week_offset: L0W
+  history_window_weeks: 9
+  min_history_for_trend_analysis: 4    # semanas con datos no-nulos
+  min_history_for_streak_detection: 3  # semanas consecutivas para activar alerta
+
+  limitations: >
+    Con 9 semanas de historia no es posible distinguir tendencia secular,
+    estacionalidad y ruido. WoW, estabilidad y drift simple son los análisis
+    temporales apropiados. Forecasting complejo no está justificado.
+
+# ===========================================================================
+# DETECTORES DEL INSIGHT ENGINE (provisionales)
+# ===========================================================================
+# Todos los thresholds son provisionales. Requieren calibración por métrica.
+insight_detectors:
+  wow_delta:
+    description: Cambio WoW absoluto y porcentual entre L0W y L1W.
+    alert_threshold_pct: 0.10    # provisional — 10% WoW como señal inicial
+    risk_level: medium
+    requires_peer_rules: false
+    limitations: >
+      Un único outlier puntual genera delta alto falso. No distingue ruido de cambio real.
+      Complementar con decline_streak para señal más robusta.
+
+  decline_streak:
+    description: Semanas consecutivas con deterioro (WoW negativo).
+    min_weeks_for_alert: 3       # provisional
+    risk_level: high
+    requires_peer_rules: false
+    limitations: >
+      Con 9 semanas, una racha de 3-4 semanas consume una fracción relevante de la historia.
+      Métricas con alta volatilidad natural generarán más falsos positivos.
+
+  deviation_vs_peer_median:
+    description: Diferencia absoluta entre valor de zona y mediana del peer group.
+    requires_peer_rules: true
+    min_peer_size: 10            # heredado de peer_groups.size_rules
+    risk_level: medium
+    limitations: >
+      Calidad del detector = calidad del peer group. Grupos pequeños generan
+      medianas frágiles que pueden ser el resultado de un solo outlier.
+
+  robust_z_score:
+    description: Z-score robusto usando MAD (Median Absolute Deviation).
+    formula: "0.6745 * (value - peer_median) / peer_MAD"
+    anomaly_threshold: 2.5       # provisional
+    risk_level: high
+    requires_peer_rules: true
+    min_peer_size: 10
+    edge_cases:
+      mad_equals_zero: >
+        Si MAD = 0 (peer muy homogéneo), el cálculo no está definido.
+        Asignar NaN y manejar explícitamente en el insight engine.
+    limitations: >
+      Mismas limitaciones de peer group que deviation_vs_peer_median.
+      Factor 0.6745 hace el valor comparable en escala a z-score estándar
+      para distribuciones normales, pero los datos operacionales rara vez son normales.
+
+# ===========================================================================
+# REGLAS DE DATOS
+# ===========================================================================
+data_quality:
+  max_missing_history_pct_for_trend: 0.50   # >50% de semanas nulas = excluir del trend
+  zone_mismatch_policy: >
+    264 zonas en órdenes sin métricas. Política por defecto: documentar mismatch
+    y aplicar filtro explícito según tipo de análisis. No omitir silenciosamente.
+  imputation_policy: none   # No se imputan faltantes en ninguna capa
+
+# ===========================================================================
+# REGLAS DE LENGUAJE DEL SISTEMA
+# ===========================================================================
+# Estas reglas gobiernan cómo el sistema genera narrativa automática.
+# Objetivo: narrativa auditada, sin afirmaciones falsas o alarmistas.
+language_rules:
+  improvement:
+    when_to_say: >
+      Solo usar "mejoró" o "empeoró" cuando desired_direction está definido
+      (higher_is_better o lower_is_better) con direction_confidence != unknown_pending_validation.
+      Para métricas con depends o unknown: describir el cambio en términos neutros.
+    example_safe: "Gross Profit UE aumentó 0.5 puntos WoW en esta zona."
+    example_unsafe: "Esta zona mejoró su rentabilidad." (requiere validación de negocio)
+
+  causal_language:
+    forbidden_terms: [causó, determinó, explica, genera, produce, es la causa de]
+    allowed_terms: [se asocia con, covaría con, coincide con, es consistente con]
+    framing: >
+      Toda relación entre métricas es una observación de co-movimiento o correlación.
+      Nunca una relación causal confirmada.
+
+  driver_hypothesis:
+    when_to_use: >
+      Solo cuando la correlación sea estadísticamente significativa Y el equipo
+      de negocio ha validado que la relación tiene sentido operacional.
+    phrasing: "Posible driver: [métrica] mostró asociación con [outcome] (ρ=[valor], n=[n])."
+
+  uncertainty:
+    always_include_when:
+      - peer group size < min_size_for_benchmark
+      - metric direction_confidence = provisional
+      - history_window < min_history_for_trend_analysis
+    format: >
+      Incluir nota de limitación al final de la respuesta.
+      Ejemplo: "Nota: benchmark basado en grupo de 7 zonas (debajo del mínimo de 10)."
+
+  limits:
+    always_cite_comparison_basis: true
+    always_cite_period: true
+    example: >
+      "ZONE_X está 3.2% por debajo de la mediana de su peer group (Wealthy / High Priority / MX)
+      en la semana L0W. Baseline: mediana del peer = 0.734 (n=23 zonas)."

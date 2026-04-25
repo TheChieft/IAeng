@@ -1,0 +1,200 @@
+# config/question_types.yaml
+# Taxonomía de intents / tipos de pregunta — Reto 1: Operational Intelligence
+#
+# ESTADO: iteración inicial.
+# Estos intents definen el contrato entre el bot y la capa semántica.
+# El LLM identifica el intent; la capa semántica ejecuta la función correspondiente.
+
+question_types:
+  - id: query
+    display_name: "Consulta directa"
+    description: >
+      Obtener el valor actual o histórico de una métrica para una entidad específica.
+      La pregunta más simple del sistema — no requiere comparación ni cálculo complejo.
+    required_params:
+      - metric_id
+      - zone_key  # [COUNTRY, CITY, ZONE] o nivel superior
+    optional_params:
+      - week_offset  # default: L0W (semana actual)
+    future_function: get_metric_value(metric_id, zone_key, week_offset)
+    compatible_metrics: all
+    examples_from_brief:
+      - "¿Cuál es el Gross Profit UE de Buenos Aires Caballito esta semana?"
+      - "¿Cuántos pedidos perfectos tuvo Lima Miraflores en L2W?"
+    support_level: bien
+
+  - id: aggregate
+    display_name: "Agregación"
+    description: >
+      Calcular un estadístico (media, mediana, suma, percentil) de una métrica
+      agrupado por una dimensión (país, ciudad, tipo de zona, etc.).
+    required_params:
+      - metric_id
+      - group_by  # COUNTRY | CITY | ZONE_TYPE | ZONE_PRIORITIZATION
+    optional_params:
+      - week_offset  # default: L0W
+      - aggregation_func  # default: median
+      - filter_condition
+    future_function: aggregate_metric(metric_id, group_by, week_offset, agg_func, filters)
+    compatible_metrics: all
+    caveats:
+      - >
+        Al agregar por país o ciudad, las zonas con historia incompleta pueden sesgar
+        la media. Preferir mediana por defecto y documentar cobertura.
+      - >
+        Zonas en ONLY_ORDERS (264) no tendrán métricas — excluir del agregado
+        y documentar la exclusión.
+    examples_from_brief:
+      - "¿Cuál es el promedio de Turbo Adoption por país esta semana?"
+      - "¿Cómo está el Pro Adoption en zonas Wealthy vs Non Wealthy?"
+    support_level: bien
+
+  - id: rank
+    display_name: "Ranking"
+    description: >
+      Ordenar entidades (zonas, ciudades, países) por valor de una métrica.
+      Top N o bottom N. Con o sin filtros.
+    required_params:
+      - metric_id
+      - entity_level  # zone | city | country
+    optional_params:
+      - week_offset  # default: L0W
+      - n  # default: 10
+      - direction  # top | bottom
+      - filter_condition
+    future_function: rank_by_metric(metric_id, entity_level, week_offset, n, direction, filters)
+    compatible_metrics: all_except: [lead_penetration]  # outliers invalidan ranking directo
+    caveats:
+      - >
+        Ranking de métricas con desired_direction = lower_is_better (ej: markdowns_gmv)
+        debe invertirse: "top" = las que tienen MENOS descuentos.
+      - >
+        lead_penetration excluida por outliers extremos que invalidan el ranking.
+    examples_from_brief:
+      - "Top 5 zonas por Perfect Orders esta semana"
+      - "¿Qué zonas tienen el Gross Profit UE más bajo en México?"
+    support_level: bien
+
+  - id: trend
+    display_name: "Tendencia temporal"
+    description: >
+      Evolución de una métrica para una entidad a lo largo de las semanas disponibles.
+      Incluye cambio WoW y descripción de la dirección general.
+    required_params:
+      - metric_id
+      - zone_key
+    optional_params:
+      - offsets  # default: L8W–L0W (todas)
+    future_function: get_trend(metric_id, zone_key, offsets)
+    compatible_metrics: all
+    caveats:
+      - >
+        Con solo 9 semanas no es posible afirmar tendencias estadísticamente robustas.
+        La respuesta describe el patrón observado, no proyecta hacia el futuro.
+      - >
+        Entidades con has_missing_history = True tienen historia incompleta.
+        La respuesta debe indicar las semanas con datos faltantes.
+    examples_from_brief:
+      - "¿Cómo ha evolucionado el Pro Adoption en Lima en las últimas 8 semanas?"
+      - "¿Hay tendencia de mejora en Perfect Orders en Buenos Aires?"
+    support_level: bien
+
+  - id: compare
+    display_name: "Comparación entre segmentos"
+    description: >
+      Comparar el valor de una métrica entre dos o más segmentos definidos
+      (tipos de zona, ciudades, períodos, etc.).
+    required_params:
+      - metric_id
+      - segment_a
+      - segment_b
+    optional_params:
+      - week_offset  # default: L0W
+    future_function: compare_segments(metric_id, segment_a, segment_b, week_offset)
+    compatible_metrics: all
+    caveats:
+      - >
+        Comparar segmentos de distinto tamaño sin normalizar puede ser engañoso.
+        Incluir n de zonas por segmento en la respuesta.
+      - >
+        Peer groups con < min_size_for_benchmark zonas → marcar como low_confidence.
+    examples_from_brief:
+      - "¿Cómo están las zonas Wealthy vs Non Wealthy en CVR de restaurantes?"
+      - "¿Hay diferencia en Perfect Orders entre zonas de alta prioridad y no priorizadas?"
+    support_level: bien
+
+  - id: multivariable_filter
+    display_name: "Filtro multivariable"
+    description: >
+      Identificar zonas que cumplen múltiples condiciones simultáneas sobre
+      distintas métricas. Screening de oportunidades o problemas.
+    required_params:
+      - conditions  # lista de {metric_id, operator, threshold}
+    optional_params:
+      - week_offset  # default: L0W
+      - entity_level  # default: zone
+    future_function: screen_by_conditions(conditions, week_offset, entity_level)
+    compatible_metrics: all_with_known_direction
+    caveats:
+      - >
+        Los thresholds de las condiciones son decisiones de negocio, no del sistema.
+        El sistema puede sugerir percentiles del dataset como referencia.
+      - >
+        Requiere que la dirección deseable de cada métrica esté validada.
+        Filtros con métricas unknown_pending_validation pueden invertir el resultado.
+    examples_from_brief:
+      - "Zonas con alto Lead Penetration y bajo Perfect Orders"
+      - "Zonas con Pro Adoption > 0.30 y Gross Profit UE < 0"
+    support_level: parcial  # thresholds no definidos aún
+
+  - id: insight_request
+    display_name: "Request de insight automático"
+    description: >
+      Detección automática de anomalías, deterioros persistentes o desviaciones
+      notables respecto al peer group para una entidad o conjunto de entidades.
+      Usa los detectores del insight engine.
+    required_params:
+      - zone_key  # o filtro más amplio (ciudad, país)
+    optional_params:
+      - metrics  # default: todas las métricas con direction_confidence != unknown
+      - detectors  # default: todos los detectores activos
+      - week_offset  # default: L0W
+    future_function: run_insight_detectors(zone_key, metrics, detectors, week_offset)
+    compatible_metrics: all_with_direction_confidence_not_unknown
+    caveats:
+      - >
+        Requiere notebook 30 (insight engine) con thresholds calibrados por métrica.
+        En estado actual, los thresholds son provisionales — alta tasa de falsos positivos esperada.
+    examples_from_brief:
+      - "¿Qué problemas tiene la zona X esta semana?"
+      - "Muéstrame zonas con deterioro persistente en cualquier métrica"
+    support_level: parcial  # detectores sin calibrar aún
+
+  - id: hypothesis_request
+    display_name: "Hipótesis explicativa"
+    description: >
+      Exploración de posibles drivers de una variación observada. Usa correlaciones
+      pre-calculadas y co-movimientos WoW. Siempre se presenta como hipótesis,
+      nunca como explicación causal.
+    required_params:
+      - outcome_metric  # la métrica a explicar (ej: órdenes)
+      - zone_key
+    optional_params:
+      - candidate_metrics  # default: todas las métricas con correlación calculada
+      - week_offset  # default: L0W
+    future_function: generate_hypothesis(outcome_metric, zone_key, candidate_metrics, week_offset)
+    compatible_metrics: see_notes
+    caveats:
+      - >
+        NUNCA presentar como causalidad. Siempre usar framing:
+        "posible driver", "asociación observada", "hipótesis de trabajo".
+      - >
+        Las correlaciones disponibles son Spearman WoW (9 semanas).
+        Evidencia débil. Útil para priorizar exploración, no para tomar decisiones.
+      - >
+        Correlaciones negativas débiles (como Gross Profit UE con -0.042)
+        no deben interpretarse como dirección de efecto.
+    examples_from_brief:
+      - "¿Qué métricas podrían explicar el crecimiento de órdenes en Lima?"
+      - "¿Qué está detrás de la caída de órdenes en Buenos Aires esta semana?"
+    support_level: parcial  # hipótesis sin validar, muestra corta

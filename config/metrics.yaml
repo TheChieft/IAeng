@@ -1,0 +1,273 @@
+# config/metrics.yaml
+# Catálogo semántico de métricas — Reto 1: Operational Intelligence
+#
+# ESTADO: iteración inicial — todas las direcciones son hipótesis de trabajo.
+# Requieren validación con el área de negocio antes de usarse en narrativa automática.
+#
+# CAMPOS:
+#   id: identificador técnico snake_case (usar en código, no mostrar al usuario)
+#   display_name: nombre para mostrar al usuario (igual que en el dato fuente)
+#   description: qué mide esta métrica
+#   metric_group: grupo operacional/funcional al que pertenece
+#   source_table: RAW_INPUT_METRICS | RAW_ORDERS
+#   scale:
+#     ratio_0_1: tasa o proporción entre 0 y 1
+#     free_signed: valor libre que puede ser negativo (ej. profit UE)
+#     ratio_anomalous: nominalmente ratio pero con outliers extremos fuera de 0-1
+#   desired_direction:
+#     higher_is_better | lower_is_better | depends | unknown_pending_validation
+#   direction_confidence:
+#     provisional: hipótesis de trabajo, sin validación de negocio
+#     confirmed: validado con área de negocio (ninguno aún)
+#   outlier_risk: low | medium | high
+#   low_coverage_peer_groups: true si tiene cobertura baja en algunos peer groups
+
+metrics:
+  - id: non_pro_ptc_op
+    display_name: "Non-Pro PTC > OP"
+    description: >
+      Tasa de conversión de pedidos Non-Pro que pasan de PTC (pass-through to cart)
+      a OP (order placed). Mide eficiencia del funnel de compra para usuarios no Pro.
+    metric_group: conversion_funnel
+    source_table: RAW_INPUT_METRICS
+    scale: ratio_0_1
+    desired_direction: higher_is_better
+    direction_confidence: provisional
+    direction_reasoning: >
+      Mayor tasa indica que más sesiones que llegan al carrito se convierten en pedido,
+      lo cual es deseable operacionalmente.
+    outlier_risk: low
+    low_coverage_peer_groups: false
+    notes: null
+
+  - id: pct_restaurants_sessions_optimal_assortment
+    display_name: "% Restaurants Sessions With Optimal Assortment"
+    description: >
+      Porcentaje de sesiones en restaurantes donde el catálogo de productos presentado
+      cumple criterios de surtido óptimo definidos por el sistema.
+    metric_group: assortment_quality
+    source_table: RAW_INPUT_METRICS
+    scale: ratio_0_1
+    desired_direction: higher_is_better
+    direction_confidence: provisional
+    direction_reasoning: >
+      Mayor cobertura de sesiones con surtido óptimo implica mejor experiencia de compra
+      y mayor probabilidad de conversión.
+    outlier_risk: low
+    low_coverage_peer_groups: false
+    notes: >
+      Distribución bimodal observada en EDA (concentración en extremos 0 y 1).
+      Verificar si la definición de "óptimo" es consistente entre zonas.
+
+  - id: pro_adoption_last_week
+    display_name: "Pro Adoption (Last Week Status)"
+    description: >
+      Porcentaje de usuarios activos que tienen suscripción Pro al cierre de la semana.
+      Snapshot semanal, no cumulativo.
+    metric_group: monetization_subscription
+    source_table: RAW_INPUT_METRICS
+    scale: ratio_0_1
+    desired_direction: higher_is_better
+    direction_confidence: provisional
+    direction_reasoning: >
+      Mayor adopción de Pro indica más usuarios con suscripción de mayor valor,
+      lo que está alineado con el modelo de monetización.
+    outlier_risk: low
+    low_coverage_peer_groups: false
+    notes: null
+
+  - id: restaurants_ss_atc_cvr
+    display_name: "Restaurants SS > ATC CVR"
+    description: >
+      Tasa de conversión de Session Start (SS) a Add-to-Cart (ATC) en restaurantes.
+      Mide qué proporción de sesiones iniciadas agregan al menos un ítem al carrito.
+    metric_group: conversion_funnel
+    source_table: RAW_INPUT_METRICS
+    scale: ratio_0_1
+    desired_direction: higher_is_better
+    direction_confidence: provisional
+    direction_reasoning: >
+      Mayor CVR SS→ATC indica mejor engagement inicial del usuario con la oferta disponible.
+    outlier_risk: low
+    low_coverage_peer_groups: false
+    notes: >
+      Correlación Spearman 0.229 con WoW de órdenes — la asociación más alta del dataset.
+      Candidata prioritaria para hipótesis de driver de crecimiento. No causalidad.
+
+  - id: restaurants_sst_ss_cvr
+    display_name: "Restaurants SST > SS CVR"
+    description: >
+      Tasa de conversión de Search Start Transaction (SST) a Session Start (SS) en restaurantes.
+      Mide qué proporción de búsquedas generan una sesión activa.
+    metric_group: conversion_funnel
+    source_table: RAW_INPUT_METRICS
+    scale: ratio_0_1
+    desired_direction: higher_is_better
+    direction_confidence: provisional
+    direction_reasoning: >
+      Mayor CVR SST→SS indica que la oferta encontrada en búsqueda es relevante
+      y genera engagement.
+    outlier_risk: low
+    low_coverage_peer_groups: false
+    notes: >
+      Rango observado: 0.116–1.000. El mínimo de 0.116 puede indicar outliers bajos
+      o zonas con problemas de relevancia de búsqueda.
+
+  - id: gross_profit_ue
+    display_name: "Gross Profit UE"
+    description: >
+      Ganancia bruta por unidad económica (unit economics). Mide rentabilidad
+      por transacción o zona. Puede ser negativo (pérdida por UE).
+    metric_group: financial_unit_economics
+    source_table: RAW_INPUT_METRICS
+    scale: free_signed
+    desired_direction: higher_is_better
+    direction_confidence: provisional
+    direction_reasoning: >
+      Valores más altos indican mayor rentabilidad por unidad. Valores negativos
+      indican pérdida operacional — no deseable.
+    outlier_risk: high
+    low_coverage_peer_groups: false
+    notes: >
+      ALTA PRECAUCIÓN: rango observado -229 a +12.8. Outliers extremos en ambas
+      direcciones. STD mediana 0.608 (la más alta del dataset). Los thresholds
+      de alerta deben ser significativamente más amplios que para métricas ratio.
+      No usar STD para reglas de anomalía — usar IQR o MAD.
+
+  - id: retail_sst_ss_cvr
+    display_name: "Retail SST > SS CVR"
+    description: >
+      Tasa de conversión de Search Start Transaction a Session Start para el
+      canal Retail (no restaurantes). Equivalente a restaurants_sst_ss_cvr en otro segmento.
+    metric_group: conversion_funnel
+    source_table: RAW_INPUT_METRICS
+    scale: ratio_0_1
+    desired_direction: higher_is_better
+    direction_confidence: provisional
+    direction_reasoning: Misma lógica que Restaurants SST > SS CVR.
+    outlier_risk: low
+    low_coverage_peer_groups: false
+    notes: >
+      Analizar junto a Restaurants SST > SS CVR para comparación entre canales.
+      No asumir que el nivel de referencia (benchmark) es el mismo para ambos canales.
+
+  - id: pct_pro_users_breakeven
+    display_name: "% PRO Users Who Breakeven"
+    description: >
+      Porcentaje de usuarios Pro cuyo uso del servicio cubre o supera el costo
+      de la suscripción (punto de equilibrio económico desde perspectiva del usuario).
+    metric_group: monetization_subscription
+    source_table: RAW_INPUT_METRICS
+    scale: ratio_0_1
+    desired_direction: higher_is_better
+    direction_confidence: provisional
+    direction_reasoning: >
+      Mayor % de usuarios que recuperan el valor de la suscripción indica mejor
+      retención potencial y menor churn de Pro.
+    outlier_risk: low
+    low_coverage_peer_groups: false
+    notes: >
+      Rango 0–1 con mediana 0.313. Distribución no observada en detalle —
+      verificar si hay bimodalidad por tipo de zona.
+
+  - id: lead_penetration
+    display_name: "Lead Penetration"
+    description: >
+      Tasa de penetración de leads. Mide qué proporción del mercado potencial
+      ha sido alcanzada o convertida. Definición exacta pendiente de validación.
+    metric_group: growth_acquisition
+    source_table: RAW_INPUT_METRICS
+    scale: ratio_anomalous
+    desired_direction: higher_is_better
+    direction_confidence: provisional
+    direction_reasoning: >
+      Mayor penetración indica mayor cobertura del mercado potencial, que es
+      generalmente deseable desde perspectiva de crecimiento.
+    outlier_risk: high
+    low_coverage_peer_groups: false
+    notes: >
+      ALTA PRECAUCIÓN: máximo observado 393.9 en una escala que debería ser ratio.
+      Esto es un outlier extremo que invalida rankings directos y STD.
+      Causas posibles: error de dato, denominador distinto en algunas zonas,
+      o definición diferente de "lead" entre mercados.
+      NO usar esta métrica en benchmarks hasta clarificar el denominador.
+
+  - id: perfect_orders
+    display_name: "Perfect Orders"
+    description: >
+      Porcentaje de pedidos entregados de forma perfecta: a tiempo, completos
+      y sin incidencias de calidad reportadas.
+    metric_group: operations_quality
+    source_table: RAW_INPUT_METRICS
+    scale: ratio_0_1
+    desired_direction: higher_is_better
+    direction_confidence: provisional
+    direction_reasoning: >
+      Más pedidos perfectos = mejor experiencia de usuario = mejor NPS y retención.
+    outlier_risk: low
+    low_coverage_peer_groups: false
+    notes: >
+      Rango 0.137–1.000. El valor mínimo de 0.137 sugiere que algunas zonas
+      tienen problemas operacionales severos. Métrica directamente accionable.
+
+  - id: mltv_top_verticals_adoption
+    display_name: "MLTV Top Verticals Adoption"
+    description: >
+      Adopción de los verticales de mayor LTV (Lifetime Value) por zona.
+      Mide qué proporción de usuarios o zonas está usando los verticales
+      de mayor valor estratégico.
+    metric_group: product_engagement
+    source_table: RAW_INPUT_METRICS
+    scale: ratio_0_1
+    desired_direction: higher_is_better
+    direction_confidence: provisional
+    direction_reasoning: >
+      Mayor adopción de verticales de alto LTV implica mayor valor por usuario
+      y mejor mix de negocio.
+    outlier_risk: low
+    low_coverage_peer_groups: false
+    notes: >
+      Cobertura incompleta en CR (Costa Rica) y algunas zonas BR.
+      Verificar si MLTV está definido consistentemente por país.
+
+  - id: restaurants_markdowns_gmv
+    display_name: "Restaurants Markdowns / GMV"
+    description: >
+      Ratio de descuentos (markdowns) sobre el Gross Merchandise Value en restaurantes.
+      Mide qué proporción del valor bruto se está sacrificando en descuentos.
+    metric_group: financial_promotions
+    source_table: RAW_INPUT_METRICS
+    scale: ratio_0_1
+    desired_direction: lower_is_better
+    direction_confidence: provisional
+    direction_reasoning: >
+      ATENCIÓN: dirección INVERSA a la mayoría de métricas.
+      Un ratio más bajo indica que se necesitan menos descuentos para generar GMV,
+      lo que implica mayor eficiencia económica de la operación.
+    outlier_risk: low
+    low_coverage_peer_groups: false
+    notes: >
+      Única métrica con desired_direction = lower_is_better en el catálogo actual.
+      Los sistemas de alerta y ranking deben manejar esta inversión explícitamente.
+      Rango observado: 0.02–0.43.
+
+  - id: turbo_adoption
+    display_name: "Turbo Adoption"
+    description: >
+      Tasa de adopción del servicio de entrega Turbo (entrega rápida premium)
+      entre los usuarios o zonas que lo tienen disponible.
+    metric_group: product_engagement
+    source_table: RAW_INPUT_METRICS
+    scale: ratio_0_1
+    desired_direction: higher_is_better
+    direction_confidence: provisional
+    direction_reasoning: >
+      Mayor adopción de Turbo indica mayor uso de un servicio premium
+      que genera ingresos adicionales y diferenciación de experiencia.
+    outlier_risk: low
+    low_coverage_peer_groups: true
+    notes: >
+      COBERTURA BAJA: solo ~38% de zonas tienen este dato en algunos peer groups.
+      No incluir en benchmarks peer hasta tener cobertura mínima (≥70% del grupo).
+      Los valores faltantes probablemente indican zonas sin disponibilidad de Turbo,
+      no zonas con 0% de adopción — la diferencia importa para el análisis.
