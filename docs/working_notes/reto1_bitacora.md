@@ -23,6 +23,10 @@ Cómo estructurar y preparar datos semanales por zona para habilitar análisis r
 6. [src/data_prep/run_initial_data_profile.py](src/data_prep/run_initial_data_profile.py)
 7. [src/data_prep/validate_pipeline.py](src/data_prep/validate_pipeline.py)
 
+### Código de análisis
+
+1. [notebooks/reto1_eda.ipynb](notebooks/reto1_eda.ipynb)
+
 ### Datos
 
 1. Fuente cruda: [data/raw/Sistema de Análisis Inteligente para Operaciones Rappi - Dummy Data (1).xlsx](data/raw/Sistema%20de%20An%C3%A1lisis%20Inteligente%20para%20Operaciones%20Rappi%20-%20Dummy%20Data%20%281%29.xlsx)
@@ -86,6 +90,7 @@ Cómo estructurar y preparar datos semanales por zona para habilitar análisis r
 3. Agregar tests automáticos de contrato de esquema y unicidad de grano en CI.
 4. Decidir tratamiento analítico de zonas sin match entre tablas.
 5. Definir estrategia de análisis para series con historia incompleta.
+6. Versionar outputs de la capa semántica y contrato de funciones para bot.
 
 ## 9) Próximos pasos
 
@@ -103,6 +108,11 @@ Cómo estructurar y preparar datos semanales por zona para habilitar análisis r
    - Se adoptó política Parquet-only para processed.
    - Se limpió ruido de repo (CSV redundantes y __pycache__).
    - Se consolidó documentación de decisiones y bitácora.
+3. Iteración 3:
+   - Se creó EDA formal en [notebooks/reto1_eda.ipynb](notebooks/reto1_eda.ipynb).
+   - Se validó estructura para capas futuras: semántica, benchmark por peers e insight engine.
+   - Se documentaron detectores transparentes iniciales (WoW, rachas, desviación vs peer median, robust z-score).
+   - Se dejó explícito el límite metodológico: hipótesis explicativas no equivalen a causalidad.
 
 ## Estructura final recomendada del repo
 

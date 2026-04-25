@@ -1,0 +1,29 @@
+{
+  "excel_path": "/home/thechieft/projects/IAeng/data/raw/Sistema de An\u00e1lisis Inteligente para Operaciones Rappi - Dummy Data (1).xlsx",
+  "sheets": {
+    "RAW_INPUT_METRICS": {
+      "shape": [
+        12573,
+        15
+      ],
+      "blank_rows": 0,
+      "exact_duplicates": 963
+    },
+    "RAW_ORDERS": {
+      "shape": [
+        1242,
+        13
+      ],
+      "blank_rows": 0,
+      "exact_duplicates": 0
+    },
+    "RAW_SUMMARY": {
+      "shape": [
+        15,
+        4
+      ],
+      "blank_rows": 0,
+      "exact_duplicates": 0
+    }
+  }
+}
