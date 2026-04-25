@@ -1,0 +1,55 @@
+{
+  "generated_at": "2026-04-25T12:38:19.230051",
+  "n_candidates": 12443,
+  "by_category": {
+    "possible_driver": 5311,
+    "opportunity": 3270,
+    "peer_gap": 2321,
+    "persistent_deterioration": 1399,
+    "anomaly": 142
+  },
+  "by_detector": {
+    "possible_driver": 5311,
+    "opportunity": 3270,
+    "peer_gap": 2321,
+    "persistent_deterioration": 1399,
+    "anomaly_point": 142
+  },
+  "score_weights": {
+    "severity": 0.45,
+    "confidence": 0.35,
+    "business_priority": 0.2
+  },
+  "penalties": {
+    "direction_confidence_provisional": 0.9,
+    "validation_pending_business": 0.9,
+    "peer_low_confidence": 0.85
+  },
+  "governance": {
+    "suspended_metrics": [
+      "lead_penetration"
+    ],
+    "peer_restricted_metrics": [
+      "lead_penetration",
+      "turbo_adoption"
+    ],
+    "peer_dims": [
+      "COUNTRY",
+      "ZONE_TYPE",
+      "ZONE_PRIORITIZATION"
+    ],
+    "thresholds": {
+      "wow_threshold_pct": 0.1,
+      "streak_min_weeks": 3,
+      "robust_z_threshold": 2.5,
+      "min_peer_size": 10,
+      "min_peer_warn": 5
+    }
+  },
+  "open_limitations": [
+    "Thresholds provisionales pendientes de calibracion por metrica",
+    "Direction confidence aun provisional en el catalogo",
+    "9 semanas limitan robustez temporal y de asociaciones",
+    "Peer groups low_confidence requieren interpretacion cautelosa"
+  ]
+}

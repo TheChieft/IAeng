@@ -142,11 +142,11 @@ No se incorpora contenido en esta iteración.
 
 ### Archivos de configuración creados
 
-| Archivo | Contenido |
-|---|---|
-| `config/metrics.yaml` | Catálogo de 13 métricas: escala, dirección, confianza, riesgo de outlier |
+| Archivo                      | Contenido                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------- |
+| `config/metrics.yaml`        | Catálogo de 13 métricas: escala, dirección, confianza, riesgo de outlier  |
 | `config/business_rules.yaml` | Entidades, peer groups, reglas temporales, detectores, reglas de lenguaje |
-| `config/question_types.yaml` | 7 intents del sistema con parámetros, funciones futuras y ejemplos |
+| `config/question_types.yaml` | 7 intents del sistema con parámetros, funciones futuras y ejemplos        |
 
 ### Notebook 20 — Semantic Layer (primera iteración real)
 
@@ -181,13 +181,13 @@ NB 30 puede ahora leer reglas de `config/business_rules.yaml` para los 4 detecto
 
 NB 20 pasó de 22 a 29 celdas. No fue rehecho — se agregaron 7 celdas nuevas y se reforzó 1.
 
-| Sección nueva | Qué hace |
-|---|---|
-| `nb20-s2b` — Contrato semántico completo | Tabla unificada: capabilities + validation_status + outlier_risk por métrica. Export CSV + MD |
-| `nb20-s5b` — Peer group operativo | Ejemplo real: zona → peer group → tamaño → confianza. Reglas de fallback. Lista "no comparable" |
-| `nb20-s6b` — Intents operativos | Tabla de intents con unsupported_cases, default_visualization, output_shape |
-| `nb20-s9-checks` (reemplazado) | 13 checks con nivel PASS/WARN/FAIL + implicación. Export semantic_checks.json + .md |
-| `nb20-s9b` — Decisiones abiertas | Tabla: cerradas vs abiertas. Riesgos para NB 30. Mitigación propuesta |
+| Sección nueva                            | Qué hace                                                                                        |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `nb20-s2b` — Contrato semántico completo | Tabla unificada: capabilities + validation_status + outlier_risk por métrica. Export CSV + MD   |
+| `nb20-s5b` — Peer group operativo        | Ejemplo real: zona → peer group → tamaño → confianza. Reglas de fallback. Lista "no comparable" |
+| `nb20-s6b` — Intents operativos          | Tabla de intents con unsupported_cases, default_visualization, output_shape                     |
+| `nb20-s9-checks` (reemplazado)           | 13 checks con nivel PASS/WARN/FAIL + implicación. Export semantic_checks.json + .md             |
+| `nb20-s9b` — Decisiones abiertas         | Tabla: cerradas vs abiertas. Riesgos para NB 30. Mitigación propuesta                           |
 
 ### Cambios en archivos de configuración
 
@@ -207,12 +207,12 @@ NB 20 pasó de 22 a 29 celdas. No fue rehecho — se agregaron 7 celdas nuevas y
 
 ### Nuevos artefactos generados por NB 20
 
-| Artefacto | Descripción |
-|---|---|
-| `reports/reto1/semantic_contract_summary.csv` | Tabla completa: 13 métricas × 17 campos |
-| `reports/reto1/semantic_contract_summary.md` | Versión markdown legible para revisión humana |
-| `reports/reto1/semantic_checks.json` | 13 checks con status PASS/WARN/FAIL + implicación |
-| `reports/reto1/semantic_checks.md` | Versión markdown de los checks |
+| Artefacto                                     | Descripción                                       |
+| --------------------------------------------- | ------------------------------------------------- |
+| `reports/reto1/semantic_contract_summary.csv` | Tabla completa: 13 métricas × 17 campos           |
+| `reports/reto1/semantic_contract_summary.md`  | Versión markdown legible para revisión humana     |
+| `reports/reto1/semantic_checks.json`          | 13 checks con status PASS/WARN/FAIL + implicación |
+| `reports/reto1/semantic_checks.md`            | Versión markdown de los checks                    |
 
 ### Decisiones semánticas cerradas (usables en NB 30)
 
@@ -230,3 +230,76 @@ NB 20 pasó de 22 a 29 celdas. No fue rehecho — se agregaron 7 celdas nuevas y
 - Calibrar `anomaly_threshold` del robust_z (actualmente 2.5)
 - Clarificar denominador de `lead_penetration`
 - Definir si `turbo_adoption` NaN = no-disponible o adopción cero
+
+---
+
+## Iteración 7 — 2026-04-25: Implementación inicial del Insight Engine (NB 30)
+
+### Cambios principales en `notebooks/reto1/30_reto1_insight_engine.ipynb`
+
+Se construyó una primera versión funcional del backend analítico de insights, gobernado por NB20.
+
+Secciones implementadas:
+1. Setup y contexto del motor.
+2. Carga y validación de inputs gobernados (configs + semantic checks + datasets).
+3. Marco metodológico de detectores con límites explícitos.
+4. Detector `anomaly_point` (modified z-score + WoW + materialidad).
+5. Detector `persistent_deterioration` (rachas de empeoramiento).
+6. Detector `peer_gap` (brecha vs mediana de peer group, con confianza del grupo).
+7. Detector `opportunity` (mejora consistente y/o outperforming defendible).
+8. Módulo `possible_driver` (asociación Spearman WoW por zona, no causal).
+9. Capa común de scoring + penalizaciones de gobernanza.
+10. Normalización a tabla maestra única de insights.
+11. Narrativa templada por categoría (sin LLM libre).
+12. Exportes técnicos y de muestras.
+13. Validación interna con casos positivos/negativos y edge cases.
+
+### Detectores implementados
+
+- `anomaly_point`
+- `persistent_deterioration`
+- `peer_gap`
+- `opportunity`
+- `possible_driver`
+
+### Reglas de gobernanza aplicadas
+
+- Exclusión de `lead_penetration` (`suspended_pending_definition`) del motor.
+- Exclusión de `turbo_adoption` de benchmarks peer.
+- Respeto de dirección invertida en `restaurants_markdowns_gmv` (`lower_is_better`).
+- Advertencia/caveat obligatoria para `direction_confidence=provisional`.
+- Penalización de score para `validation_status=pending_business_validation`.
+- No benchmark para peer groups `too_small`; `low_confidence` penalizado explícitamente.
+
+### Scoring definido (provisional)
+
+- `severity_score`: intensidad de señal del detector.
+- `confidence_score`: calidad de evidencia + penalizaciones semánticas/peer.
+- `business_priority_score`: mapeo desde `ZONE_PRIORITIZATION`.
+- `final_rank_score`:
+   - pesos base: severity 0.45, confidence 0.35, business priority 0.20.
+   - penalizaciones multiplicativas:
+      - direction provisional: 0.90
+      - validation pending business: 0.90
+      - peer low confidence: 0.85
+
+### Artefactos nuevos generados
+
+- `reports/reto1/insight_candidates.parquet`
+- `reports/reto1/insight_candidates.csv`
+- `reports/reto1/insight_engine_report.md`
+- `reports/reto1/insight_engine_report.json`
+- `reports/reto1/insight_samples.md`
+
+### Riesgos y límites abiertos
+
+1. Los thresholds de detectores siguen provisionales y requieren calibración por métrica.
+2. El histórico de 9 semanas limita robustez de persistencia y asociaciones.
+3. `desired_direction` sigue pendiente de confirmación de negocio para producción.
+4. La categoría `possible_driver` debe tratarse como priorización exploratoria, no causalidad.
+
+### Qué habilita para NB40
+
+- Un contrato de salida único (`insight_candidates.*`) para que el chatbot consuma hallazgos.
+- Narrativas base controladas por plantilla y caveats semánticos.
+- Priorización cuantitativa reproducible para ordenar respuestas del bot.
